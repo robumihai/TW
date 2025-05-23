@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real Estate Management</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Real Estate Management</h1>
+        <nav>
+            <button id="addPropertyBtn">Add Property</button>
+        </nav>
+    </header>
+
+    <main>
+        <div id="map"></div>
+        <div id="propertyList">
+            <h2>Available Properties</h2>
+            <div id="properties"></div>
+        </div>
+    </main>
+
+    <div id="addPropertyModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add New Property</h2>
+            <form id="propertyForm">
+                <input type="text" id="title" placeholder="Title" required>
+                <textarea id="description" placeholder="Description" required></textarea>
+                <input type="number" id="price" placeholder="Price" required>
+                <select id="type" required>
+                    <option value="sale">For Sale</option>
+                    <option value="rent">For Rent</option>
+                </select>
+                <input type="text" id="contact" placeholder="Contact Information" required>
+                <button type="submit">Add Property</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html> 
