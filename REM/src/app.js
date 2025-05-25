@@ -64,6 +64,17 @@ app.post('/api/properties', (req, res) => {
     });
 });
 
+app.delete('/api/properties/:id', (req, res) => {
+    const { id } = req.params;
+    db.run('DELETE FROM properties WHERE id = ?', [id], function(err) {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        res.json({ deleted: this.changes });
+    });
+});
+
 // Serve the main page
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/index.html'));
