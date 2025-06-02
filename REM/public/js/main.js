@@ -111,118 +111,29 @@ function initializeLayers() {
     });
 }
 
+// Layer toggle event listeners
+document.querySelectorAll('.layer-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        const layerName = this.id.split('-')[1];
+        if (this.checked) {
+            map.addLayer(layers[layerName]);
+        } else {
+            map.removeLayer(layers[layerName]);
+        }
+    });
+});
+
+// Initialize all map layers
 initializeLayers();
 
-// Layer checkbox handlers
-document.getElementById('layer-pollution').addEventListener('change', function() {
-    toggleLayer('pollution', this.checked);
-});
+// Property markers group
+const markers = L.layerGroup().addTo(map);
 
-document.getElementById('layer-crime').addEventListener('change', function() {
-    toggleLayer('crime', this.checked);
-});
-
-document.getElementById('layer-temperature').addEventListener('change', function() {
-    toggleLayer('temperature', this.checked);
-});
-
-document.getElementById('layer-parking').addEventListener('change', function() {
-    toggleLayer('parking', this.checked);
-});
-
-document.getElementById('layer-shops').addEventListener('change', function() {
-    toggleLayer('shops', this.checked);
-});
-
-document.getElementById('layer-crowd').addEventListener('change', function() {
-    toggleLayer('crowd', this.checked);
-});
-
-function toggleLayer(layerName, isVisible) {
-    if (isVisible) {
-        map.addLayer(layers[layerName]);
-    } else {
-        map.removeLayer(layers[layerName]);
-    }
-}
-
-// Modal handling
-const addPropertyModal = document.getElementById('addPropertyModal');
-const filterModal = document.getElementById('filterModal');
-const addBtn = document.getElementById('addPropertyBtn');
-const filterBtn = document.getElementById('filterBtn');
-const closeBtns = document.getElementsByClassName('close');
-
-addBtn.onclick = () => {
-    addPropertyModal.style.display = "block";
-    initFormMap();
-};
-
-filterBtn.onclick = () => {
-    filterModal.style.display = "block";
-};
-
-for (let i = 0; i < closeBtns.length; i++) {
-    closeBtns[i].onclick = function() {
-        addPropertyModal.style.display = "none";
-        filterModal.style.display = "none";
-    };
-}
-
-window.onclick = (event) => {
-    if (event.target == addPropertyModal) {
-        addPropertyModal.style.display = "none";
-    } else if (event.target == filterModal) {
-        filterModal.style.display = "none";
-    }
-};
-
-// Form map for selecting location
-let formMap;
-let formMarker;
-
-function initFormMap() {
-    if (formMap) {
-        formMap.remove();
-    }
-    
-    formMap = L.map('form-map').setView([44.4268, 26.1025], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(formMap);
-    
-    formMap.on('click', function(e) {
-        setFormLocation(e.latlng.lat, e.latlng.lng);
-    });
-    
-    // Set initial marker if coordinates are already set
-    const lat = document.getElementById('latitude').value;
-    const lng = document.getElementById('longitude').value;
-    if (lat && lng) {
-        setFormLocation(lat, lng);
-    }
-}
-
-function setFormLocation(lat, lng) {
-    document.getElementById('latitude').value = lat;
-    document.getElementById('longitude').value = lng;
-    
-    if (formMarker) {
-        formMap.removeLayer(formMarker);
-    }
-    
-    formMarker = L.marker([lat, lng]).addTo(formMap);
-}
-
-// Property markers
-let markers = [];
-
-// Load properties
+// Load properties from API
 async function loadProperties() {
     try {
         const response = await fetch('/api/properties');
         const properties = await response.json();
-        
         displayProperties(properties);
     } catch (error) {
         console.error('Error loading properties:', error);
@@ -231,152 +142,250 @@ async function loadProperties() {
 
 // Display properties on map and in list
 function displayProperties(properties) {
-    // Clear existing markers
-    markers.forEach(marker => map.removeLayer(marker));
-    markers = [];
+    // Clear existing markers and list
+    markers.clearLayers();
+    document.getElementById('properties').innerHTML = '';
     
-    // Clear property list
-    const propertyList = document.getElementById('properties');
-    propertyList.innerHTML = '';
-    
+    // Add property markers to map and list
     properties.forEach(property => {
         // Add marker to map
         const marker = L.marker([property.latitude, property.longitude])
             .bindPopup(`
-                <strong>${property.title}</strong><br>
-                ${property.description}<br>
-                Price: ${property.price}<br>
-                Type: ${property.type}<br>
-                Property Type: ${property.property_type || 'N/A'}<br>
-                Area: ${property.area || 'N/A'} m²<br>
-                Contact: ${property.contact_info}
+                <h3>${property.title}</h3>
+                <p><strong>Price:</strong> $${property.price.toLocaleString()}</p>
+                <p><strong>Type:</strong> ${property.type === 'sale' ? 'For Sale' : 'For Rent'}</p>
+                <p><strong>Area:</strong> ${property.area} m²</p>
+                <a href="#" class="view-property" data-id="${property.id}">View Details</a>
             `);
-        markers.push(marker);
-        marker.addTo(map);
         
-        // Add to property list
-        const propertyCard = document.createElement('div');
-        propertyCard.className = 'property-card';
-        propertyCard.innerHTML = `
+        markers.addLayer(marker);
+        
+        // Add property to list
+        const propertyEl = document.createElement('div');
+        propertyEl.className = 'property-card';
+        propertyEl.dataset.id = property.id;
+        
+        // Create property card HTML
+        propertyEl.innerHTML = `
             <h3>${property.title}</h3>
-            <p>${property.description}</p>
-            <p><strong>Price:</strong> ${property.price}</p>
-            <p><strong>Type:</strong> ${property.type}</p>
-            <p><strong>Property Type:</strong> ${property.property_type || 'N/A'}</p>
-            <p><strong>Area:</strong> ${property.area || 'N/A'} m²</p>
-            ${property.building_condition ? `<p><strong>Building Condition:</strong> ${property.building_condition}</p>` : ''}
-            ${property.facilities ? `<p><strong>Facilities:</strong> ${property.facilities}</p>` : ''}
-            ${property.risks ? `<p><strong>Risks:</strong> ${property.risks}</p>` : ''}
-            <p><strong>Contact:</strong> ${property.contact_info}</p>
+            <p><strong>Price:</strong> $${property.price.toLocaleString()}</p>
+            <p><strong>Type:</strong> ${property.type === 'sale' ? 'For Sale' : 'For Rent'}</p>
+            <p><strong>Property Type:</strong> ${property.property_type}</p>
+            <p><strong>Area:</strong> ${property.area} m²</p>
             <div class="property-actions">
-                <button class="delete-property" data-id="${property.id}">Delete</button>
+                <button class="view-property" data-id="${property.id}">View Details</button>
+                ${canEditProperty(property.owner_id) ? 
+                  `<button class="delete-property" data-id="${property.id}">Delete</button>` : ''}
             </div>
         `;
-        propertyList.appendChild(propertyCard);
+        
+        document.getElementById('properties').appendChild(propertyEl);
     });
     
-    // Add event listeners to delete buttons
-    document.querySelectorAll('.delete-property').forEach(button => {
-        button.addEventListener('click', async function() {
-            const id = this.getAttribute('data-id');
-            await deleteProperty(id);
+    // Add event listeners to view and delete buttons
+    document.querySelectorAll('.view-property').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const id = this.dataset.id;
+            // In a real app, this would show a modal with property details
+            alert(`View property ${id}`);
+        });
+    });
+    
+    document.querySelectorAll('.delete-property').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            deleteProperty(id);
         });
     });
 }
 
 // Delete property
 async function deleteProperty(id) {
-    try {
-        const response = await fetch(`/api/properties/${id}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            loadProperties();
+    if (!isLoggedIn()) {
+        alert('You must be logged in to delete properties');
+        window.location.href = '/login';
+        return;
+    }
+    
+    if (confirm('Are you sure you want to delete this property?')) {
+        try {
+            const response = await authenticatedFetch(`/api/properties/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (response && response.ok) {
+                alert('Property deleted successfully');
+                loadProperties(); // Reload the properties
+            } else if (response) {
+                const data = await response.json();
+                alert('Error: ' + (data.error || 'Failed to delete property'));
+            }
+        } catch (error) {
+            console.error('Error deleting property:', error);
+            alert('An error occurred while deleting the property');
         }
-    } catch (error) {
-        console.error('Error deleting property:', error);
     }
 }
 
-// Handle form submission
-document.getElementById('propertyForm').onsubmit = async (e) => {
+// Handle add property form
+const propertyForm = document.getElementById('propertyForm');
+const addPropertyModal = document.getElementById('addPropertyModal');
+const modalMap = L.map('form-map').setView([44.4268, 26.1025], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(modalMap);
+
+// Show modal when add property button is clicked
+document.getElementById('addPropertyBtn').addEventListener('click', function() {
+    if (!isLoggedIn()) {
+        alert('You must be logged in to add properties');
+        window.location.href = '/login';
+        return;
+    }
+    
+    addPropertyModal.style.display = 'block';
+    setTimeout(() => {
+        modalMap.invalidateSize();
+    }, 100);
+});
+
+// Close modal when X is clicked
+document.querySelector('.close').addEventListener('click', function() {
+    addPropertyModal.style.display = 'none';
+});
+
+// Close modal when clicking outside
+window.addEventListener('click', function(e) {
+    if (e.target === addPropertyModal) {
+        addPropertyModal.style.display = 'none';
+    }
+});
+
+// Allow setting location by clicking on map
+let marker;
+modalMap.on('click', function(e) {
+    document.getElementById('latitude').value = e.latlng.lat;
+    document.getElementById('longitude').value = e.latlng.lng;
+    
+    if (marker) {
+        modalMap.removeLayer(marker);
+    }
+    
+    marker = L.marker(e.latlng).addTo(modalMap);
+});
+
+// Submit form
+propertyForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const property = {
+    if (!isLoggedIn()) {
+        alert('You must be logged in to add properties');
+        window.location.href = '/login';
+        return;
+    }
+    
+    const formData = {
         title: document.getElementById('title').value,
         description: document.getElementById('description').value,
-        price: document.getElementById('price').value,
+        price: parseFloat(document.getElementById('price').value),
         type: document.getElementById('type').value,
         property_type: document.getElementById('property_type').value,
-        area: document.getElementById('area').value,
+        area: parseFloat(document.getElementById('area').value),
         building_condition: document.getElementById('building_condition').value,
         facilities: document.getElementById('facilities').value,
         risks: document.getElementById('risks').value,
-        latitude: document.getElementById('latitude').value,
-        longitude: document.getElementById('longitude').value,
+        latitude: parseFloat(document.getElementById('latitude').value),
+        longitude: parseFloat(document.getElementById('longitude').value),
         contact_info: document.getElementById('contact').value
     };
     
     try {
-        const response = await fetch('/api/properties', {
+        const response = await authenticatedFetch('/api/properties', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(property)
+            body: JSON.stringify(formData)
         });
         
-        if (response.ok) {
-            addPropertyModal.style.display = "none";
-            document.getElementById('propertyForm').reset();
-            loadProperties();
+        if (response && response.ok) {
+            alert('Property added successfully');
+            propertyForm.reset();
+            addPropertyModal.style.display = 'none';
+            loadProperties(); // Reload properties
+        } else if (response) {
+            const data = await response.json();
+            alert('Error: ' + (data.error || 'Failed to add property'));
         }
     } catch (error) {
         console.error('Error adding property:', error);
+        alert('An error occurred while adding the property');
     }
-};
+});
 
-// Handle filter form submission
-document.getElementById('filterForm').onsubmit = async (e) => {
+// Filter properties
+const filterForm = document.getElementById('filterForm');
+const filterModal = document.getElementById('filterModal');
+
+// Show filter modal when filter button is clicked
+document.getElementById('filterBtn').addEventListener('click', function() {
+    filterModal.style.display = 'block';
+});
+
+// Close filter modal
+document.querySelector('.filter-close').addEventListener('click', function() {
+    filterModal.style.display = 'none';
+});
+
+// Close filter modal when clicking outside
+window.addEventListener('click', function(e) {
+    if (e.target === filterModal) {
+        filterModal.style.display = 'none';
+    }
+});
+
+// Submit filter form
+filterForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     
+    const params = new URLSearchParams();
+    
     const type = document.getElementById('filter-type').value;
-    const property_type = document.getElementById('filter-property-type').value;
-    const min_price = document.getElementById('filter-min-price').value;
-    const max_price = document.getElementById('filter-max-price').value;
-    const min_area = document.getElementById('filter-min-area').value;
-    const max_area = document.getElementById('filter-max-area').value;
+    if (type) params.append('type', type);
+    
+    const propertyType = document.getElementById('filter-property-type').value;
+    if (propertyType) params.append('property_type', propertyType);
+    
+    const minPrice = document.getElementById('filter-min-price').value;
+    if (minPrice) params.append('min_price', minPrice);
+    
+    const maxPrice = document.getElementById('filter-max-price').value;
+    if (maxPrice) params.append('max_price', maxPrice);
+    
+    const minArea = document.getElementById('filter-min-area').value;
+    if (minArea) params.append('min_area', minArea);
+    
+    const maxArea = document.getElementById('filter-max-area').value;
+    if (maxArea) params.append('max_area', maxArea);
+    
     const facilities = document.getElementById('filter-facilities').value;
+    if (facilities) params.append('facilities', facilities);
     
     try {
-        let url = '/api/properties/filter?';
-        const params = [];
-        
-        if (type) params.push(`type=${type}`);
-        if (property_type) params.push(`property_type=${property_type}`);
-        if (min_price) params.push(`min_price=${min_price}`);
-        if (max_price) params.push(`max_price=${max_price}`);
-        if (min_area) params.push(`min_area=${min_area}`);
-        if (max_area) params.push(`max_area=${max_area}`);
-        if (facilities) params.push(`facilities=${facilities}`);
-        
-        url += params.join('&');
-        
-        const response = await fetch(url);
+        const response = await fetch(`/api/properties/filter?${params.toString()}`);
         const properties = await response.json();
         
-        filterModal.style.display = "none";
         displayProperties(properties);
+        filterModal.style.display = 'none';
     } catch (error) {
         console.error('Error filtering properties:', error);
     }
-};
+});
 
 // Reset filters
 document.getElementById('resetFilters').addEventListener('click', function() {
+    filterForm.reset();
     loadProperties();
-    filterModal.style.display = "none";
+    filterModal.style.display = 'none';
 });
 
 // Export buttons
@@ -423,5 +432,11 @@ document.getElementById('findNearbyBtn').addEventListener('click', function() {
     }
 });
 
-// Initial load
-loadProperties(); 
+// Update UI based on authentication
+document.addEventListener('DOMContentLoaded', function() {
+    // Update UI elements based on authentication
+    updateAuthUI();
+    
+    // Initial load
+    loadProperties();
+});

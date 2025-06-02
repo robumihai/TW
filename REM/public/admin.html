@@ -107,6 +107,19 @@
         </div>
     </main>
 
+    <script src="js/auth-utils.js"></script>
     <script src="js/admin.js"></script>
+    <script>
+        // Check if user is admin, otherwise redirect to login
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!isLoggedIn()) {
+                alert('You must be logged in to access the admin panel');
+                window.location.href = '/login';
+            } else if (!isAdmin()) {
+                alert('You do not have permission to access the admin panel');
+                window.location.href = '/';
+            }
+        });
+    </script>
 </body>
 </html> 

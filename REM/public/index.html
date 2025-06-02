@@ -11,12 +11,17 @@
     <header>
         <h1>Real Estate Management</h1>
         <nav>
-            <button id="addPropertyBtn">Add Property</button>
-            <button id="filterBtn">Filter</button>
-            <button id="exportJsonBtn">Export JSON</button>
-            <button id="exportCsvBtn">Export CSV</button>
-            <button id="findNearbyBtn">Find Nearby</button>
-            <a href="/admin" class="admin-link">Admin Panel</a>
+            <div class="nav-actions">
+                <button id="addPropertyBtn">Add Property</button>
+                <button id="filterBtn">Filter</button>
+                <button id="exportJsonBtn">Export JSON</button>
+                <button id="exportCsvBtn">Export CSV</button>
+                <button id="findNearbyBtn">Find Nearby</button>
+                <a href="/admin" class="admin-link">Admin Panel</a>
+            </div>
+            <div class="auth-actions" id="authLinks">
+                <!-- Authentication links will be inserted here via JavaScript -->
+            </div>
         </nav>
     </header>
 
@@ -132,6 +137,7 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="js/auth-utils.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html> 
