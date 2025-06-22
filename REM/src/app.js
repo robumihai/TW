@@ -8,10 +8,20 @@ const { Parser } = require('json2csv');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Import controllers
+const PropertyController = require('./controllers/PropertyController');
+const UserController = require('./controllers/UserController');
+
+// Import middleware
+const { authenticate, requireAdmin } = require('./middleware/auth');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
+
+// Apply authentication middleware to all routes
+app.use(authenticate);
 
 // Database setup
 const db = new sqlite3.Database('./database/rem.db', (err) => {
@@ -23,9 +33,30 @@ const db = new sqlite3.Database('./database/rem.db', (err) => {
     }
 });
 
+// Check and add owner_id column if it does not exist
+function ensureOwnerIdColumn() {
+    db.get("PRAGMA table_info(properties)", (err, row) => {
+        if (err) return;
+        db.all("PRAGMA table_info(properties)", (err, columns) => {
+            if (err) return;
+            const hasOwnerId = columns.some(col => col.name === 'owner_id');
+            if (!hasOwnerId) {
+                db.run('ALTER TABLE properties ADD COLUMN owner_id INTEGER', (err) => {
+                    if (err) {
+                        console.error('Failed to add owner_id column:', err.message);
+                    } else {
+                        console.log('Added owner_id column to properties table.');
+                    }
+                });
+            }
+        });
+    });
+}
+
 // Create tables
 function createTables() {
     db.serialize(() => {
+        // Properties table with owner_id field
         db.run(`CREATE TABLE IF NOT EXISTS properties (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -40,260 +71,93 @@ function createTables() {
             latitude REAL NOT NULL,
             longitude REAL NOT NULL,
             contact_info TEXT NOT NULL,
+            owner_id INTEGER,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )`);
+        )`, [], (err) => {
+            if (!err) ensureOwnerIdColumn();
+        });
+        
+        // Users table
+        db.run(`CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT,
+            is_admin INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`, [], (err) => {
+            if (err) {
+                console.error('Error creating users table:', err);
+            } else {
+                // Create default admin user if none exists
+                db.get('SELECT COUNT(*) as count FROM users WHERE is_admin = 1', [], (err, row) => {
+                    if (err) {
+                        console.error('Error checking admin users:', err);
+                        return;
+                    }
+                    
+                    if (row.count === 0) {
+                        const bcrypt = require('bcrypt');
+                        bcrypt.hash('admin123', 10, (err, hashedPassword) => {
+                            if (err) {
+                                console.error('Error hashing password:', err);
+                                return;
+                            }
+                            
+                            db.run('INSERT INTO users (username, password, email, name, is_admin) VALUES (?, ?, ?, ?, ?)',
+                                ['admin', hashedPassword, 'admin@rem.com', 'Administrator', 1],
+                                (err) => {
+                                    if (err) {
+                                        console.error('Error creating default admin:', err);
+                                    } else {
+                                        console.log('Default admin user created. Username: admin, Password: admin123');
+                                    }
+                                });
+                        });
+                    }
+                });
+            }
+        });
     });
 }
 
-// Routes
-app.get('/api/properties', (req, res) => {
-    db.all('SELECT * FROM properties', [], (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        res.json(rows);
-    });
-});
+// Authentication routes
+app.post('/api/auth/register', UserController.register);
+app.post('/api/auth/login', UserController.login);
+app.get('/api/auth/profile', UserController.getProfile);
 
-app.post('/api/properties', (req, res) => {
-    const { 
-        title, 
-        description, 
-        price, 
-        type, 
-        property_type,
-        area,
-        building_condition,
-        facilities,
-        risks,
-        latitude, 
-        longitude, 
-        contact_info 
-    } = req.body;
-    
-    const sql = `INSERT INTO properties (
-        title, description, price, type, property_type, area,
-        building_condition, facilities, risks, latitude, longitude, contact_info
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    
-    db.run(sql, [
-        title, description, price, type, property_type, area,
-        building_condition, facilities, risks, latitude, longitude, contact_info
-    ], function(err) {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        res.json({ id: this.lastID });
-    });
-});
+// Properties routes
+app.get('/api/properties', PropertyController.getAllProperties);
+app.get('/api/properties/:id', PropertyController.getPropertyById);
+app.post('/api/properties', PropertyController.addProperty);
+app.delete('/api/properties/:id', PropertyController.deleteProperty);
 
-app.delete('/api/properties/:id', (req, res) => {
-    const { id } = req.params;
-    db.run('DELETE FROM properties WHERE id = ?', [id], function(err) {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        res.json({ deleted: this.changes });
-    });
-});
+app.get('/api/properties/filter', PropertyController.filterProperties);
+app.get('/api/properties/nearby', PropertyController.findNearbyProperties);
 
-// Filtering endpoint
-app.get('/api/properties/filter', (req, res) => {
-    const {
-        type,
-        property_type,
-        min_price,
-        max_price,
-        min_area,
-        max_area,
-        facilities
-    } = req.query;
+// Export/Import routes
+app.get('/api/export/json', PropertyController.exportAsJson);
+app.get('/api/export/csv', PropertyController.exportAsCsv);
+app.post('/api/import/json', requireAdmin, PropertyController.importFromJson);
 
-    let conditions = [];
-    let params = [];
-
-    if (type) {
-        conditions.push('type = ?');
-        params.push(type);
-    }
-
-    if (property_type) {
-        conditions.push('property_type = ?');
-        params.push(property_type);
-    }
-
-    if (min_price) {
-        conditions.push('price >= ?');
-        params.push(min_price);
-    }
-
-    if (max_price) {
-        conditions.push('price <= ?');
-        params.push(max_price);
-    }
-
-    if (min_area) {
-        conditions.push('area >= ?');
-        params.push(min_area);
-    }
-
-    if (max_area) {
-        conditions.push('area <= ?');
-        params.push(max_area);
-    }
-
-    if (facilities) {
-        conditions.push('facilities LIKE ?');
-        params.push(`%${facilities}%`);
-    }
-
-    let sql = 'SELECT * FROM properties';
-    if (conditions.length > 0) {
-        sql += ' WHERE ' + conditions.join(' AND ');
-    }
-
-    db.all(sql, params, (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        res.json(rows);
-    });
-});
-
-// Nearby properties endpoint using coordinates
-app.get('/api/properties/nearby', (req, res) => {
-    const { latitude, longitude, radius = 5 } = req.query;
-    
-    if (!latitude || !longitude) {
-        return res.status(400).json({ error: 'Latitude and longitude are required' });
-    }
-    
-    // Simple distance calculation (not perfect but works for small distances)
-    const sql = `
-        SELECT *, (
-            (latitude - ?)*(latitude - ?) + 
-            (longitude - ?)*(longitude - ?)
-        ) AS distance 
-        FROM properties 
-        ORDER BY distance ASC
-        LIMIT 10
-    `;
-    
-    db.all(sql, [latitude, latitude, longitude, longitude], (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        res.json(rows);
-    });
-});
-
-// Export data as JSON
-app.get('/api/export/json', (req, res) => {
-    db.all('SELECT * FROM properties', [], (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', 'attachment; filename=properties.json');
-        res.json(rows);
-    });
-});
-
-// Export data as CSV
-app.get('/api/export/csv', (req, res) => {
-    db.all('SELECT * FROM properties', [], (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        
-        try {
-            const fields = [
-                'id', 'title', 'description', 'price', 'type', 'property_type', 
-                'area', 'building_condition', 'facilities', 'risks', 
-                'latitude', 'longitude', 'contact_info', 'created_at'
-            ];
-            const parser = new Parser({ fields });
-            const csv = parser.parse(rows);
-            
-            res.setHeader('Content-Type', 'text/csv');
-            res.setHeader('Content-Disposition', 'attachment; filename=properties.csv');
-            res.send(csv);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    });
-});
-
-// Import data from JSON
-app.post('/api/import/json', (req, res) => {
-    const properties = req.body;
-    
-    if (!Array.isArray(properties)) {
-        return res.status(400).json({ error: 'Invalid JSON format. Expected array of properties.' });
-    }
-    
-    let successCount = 0;
-    let errorCount = 0;
-    
-    const insertProperty = (property) => {
-        return new Promise((resolve, reject) => {
-            const sql = `INSERT INTO properties (
-                title, description, price, type, property_type, area,
-                building_condition, facilities, risks, latitude, longitude, contact_info
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-            
-            db.run(sql, [
-                property.title, property.description, property.price, property.type, 
-                property.property_type, property.area, property.building_condition, 
-                property.facilities, property.risks, property.latitude, 
-                property.longitude, property.contact_info
-            ], function(err) {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(this.lastID);
-                }
-            });
-        });
-    };
-    
-    const promises = properties.map(property => {
-        return insertProperty(property)
-            .then(() => { successCount++; })
-            .catch(() => { errorCount++; });
-    });
-    
-    Promise.all(promises)
-        .then(() => {
-            res.json({ 
-                message: 'Import completed', 
-                success: successCount, 
-                errors: errorCount 
-            });
-        })
-        .catch(err => {
-            res.status(500).json({ error: err.message });
-        });
-});
-
-// Serve the main page
+// HTML routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// Serve the admin page
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/admin.html'));
 });
 
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/login.html'));
+});
+
+app.get('/register', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/register.html'));
+});
+
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
-}); 
+});

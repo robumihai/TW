@@ -1,0 +1,275 @@
+// Admin Panel JavaScript
+
+// Navigation
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab navigation
+    const navLinks = document.querySelectorAll('.admin-sidebar a');
+    const sections = document.querySelectorAll('.admin-section');
+    
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const targetId = this.getAttribute('href').substring(1);
+            
+            // Update active link
+            navLinks.forEach(link => link.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Show target section
+            sections.forEach(section => {
+                section.classList.remove('active');
+                if (section.id === targetId) {
+                    section.classList.add('active');
+                }
+            });
+        });
+    });
+    
+    // Load properties
+    loadProperties();
+    
+    // Load statistics
+    loadStatistics();
+    
+    // Setup event listeners
+    document.getElementById('refreshProperties').addEventListener('click', loadProperties);
+    document.getElementById('adminExportJson').addEventListener('click', function() {
+        window.open('/api/export/json', '_blank');
+    });
+    document.getElementById('adminExportCsv').addEventListener('click', function() {
+        window.open('/api/export/csv', '_blank');
+    });
+    document.getElementById('importForm').addEventListener('submit', importProperties);
+});
+
+// Load properties for admin table
+async function loadProperties() {
+    try {
+        const response = await authenticatedFetch('/api/properties');
+        if (!response) return;
+        
+        const properties = await response.json();
+        const tbody = document.getElementById('propertiesTableBody');
+        tbody.innerHTML = '';
+        
+        properties.forEach(property => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${property.id}</td>
+                <td>${property.title}</td>
+                <td>$${property.price.toLocaleString()}</td>
+                <td>${property.type === 'sale' ? 'For Sale' : 'For Rent'}</td>
+                <td>${property.property_type}</td>
+                <td>${property.area} m²</td>
+                <td>
+                    <button class="admin-btn delete-btn" data-id="${property.id}">Delete</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+        
+        // Add event listeners to delete buttons
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const id = this.dataset.id;
+                deleteProperty(id);
+            });
+        });
+    } catch (error) {
+        console.error('Error loading properties:', error);
+    }
+}
+
+// Delete property
+async function deleteProperty(id) {
+    if (confirm('Are you sure you want to delete this property?')) {
+        try {
+            const response = await authenticatedFetch(`/api/properties/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (!response) return;
+            
+            if (response.ok) {
+                alert('Property deleted successfully');
+                loadProperties();
+                loadStatistics();
+            } else {
+                const data = await response.json();
+                alert('Error: ' + (data.error || 'Failed to delete property'));
+            }
+        } catch (error) {
+            console.error('Error deleting property:', error);
+            alert('An error occurred while deleting the property');
+        }
+    }
+}
+
+// Import properties
+async function importProperties(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('importFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Please select a file');
+        return;
+    }
+    
+    if (file.type !== 'application/json') {
+        alert('Please select a JSON file');
+        return;
+    }
+    
+    try {
+        const reader = new FileReader();
+        
+        reader.onload = async function(e) {
+            try {
+                const properties = JSON.parse(e.target.result);
+                
+                const response = await authenticatedFetch('/api/import/json', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(properties)
+                });
+                
+                if (!response) return;
+                
+                const result = await response.json();
+                
+                if (result.error) {
+                    document.getElementById('importResult').innerHTML = `
+                        <div class="error">${result.error}</div>
+                    `;
+                } else {
+                    document.getElementById('importResult').innerHTML = `
+                        <div class="success">
+                            Import completed:<br>
+                            - ${result.success} properties imported successfully<br>
+                            - ${result.errors} errors
+                        </div>
+                    `;
+                    loadProperties();
+                    loadStatistics();
+                }
+            } catch (error) {
+                console.error('Error parsing JSON:', error);
+                document.getElementById('importResult').innerHTML = `
+                    <div class="error">Invalid JSON format</div>
+                `;
+            }
+        };
+        
+        reader.readAsText(file);
+    } catch (error) {
+        console.error('Error reading file:', error);
+        document.getElementById('importResult').innerHTML = `
+            <div class="error">Error reading file</div>
+        `;
+    }
+}
+
+// Load statistics
+async function loadStatistics() {
+    try {
+        const response = await authenticatedFetch('/api/properties');
+        if (!response) return;
+        
+        const properties = await response.json();
+        
+        // Calculate statistics
+        const totalProperties = properties.length;
+        const forSaleCount = properties.filter(p => p.type === 'sale').length;
+        const forRentCount = properties.filter(p => p.type === 'rent').length;
+        
+        // Calculate average price
+        let totalPrice = 0;
+        properties.forEach(property => {
+            totalPrice += property.price;
+        });
+        const averagePrice = totalProperties > 0 ? totalPrice / totalProperties : 0;
+        
+        // Update DOM
+        document.getElementById('totalProperties').textContent = totalProperties;
+        document.getElementById('forSaleCount').textContent = forSaleCount;
+        document.getElementById('forRentCount').textContent = forRentCount;
+        document.getElementById('averagePrice').textContent = '$' + averagePrice.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+        
+        // Create property type distribution chart
+        createPropertyTypeChart(properties);
+    } catch (error) {
+        console.error('Error loading statistics:', error);
+    }
+}
+
+// Create property type chart
+function createPropertyTypeChart(properties) {
+    const chartContainer = document.getElementById('propertyTypeChart');
+    chartContainer.innerHTML = '';
+    
+    // Count property types
+    const propertyTypes = {};
+    properties.forEach(property => {
+        if (!propertyTypes[property.property_type]) {
+            propertyTypes[property.property_type] = 0;
+        }
+        propertyTypes[property.property_type]++;
+    });
+    
+    // Create chart data
+    const data = Object.entries(propertyTypes).map(([type, count]) => ({
+        type: type.charAt(0).toUpperCase() + type.slice(1),
+        count
+    }));
+    
+    // Sort data by count (descending)
+    data.sort((a, b) => b.count - a.count);
+    
+    // Create chart
+    const colors = ['#4CAF50', '#2196F3', '#FFC107', '#9C27B0', '#F44336', '#607D8B'];
+    
+    // Simple bar chart
+    const chart = document.createElement('div');
+    chart.className = 'bar-chart';
+    
+    const maxCount = Math.max(...data.map(d => d.count));
+    
+    data.forEach((item, i) => {
+        const barContainer = document.createElement('div');
+        barContainer.className = 'bar-container';
+        
+        const label = document.createElement('div');
+        label.className = 'bar-label';
+        label.textContent = item.type;
+        
+        const barWrapper = document.createElement('div');
+        barWrapper.className = 'bar-wrapper';
+        
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.width = `${(item.count / maxCount) * 100}%`;
+        bar.style.backgroundColor = colors[i % colors.length];
+        
+        const value = document.createElement('div');
+        value.className = 'bar-value';
+        value.textContent = item.count;
+        
+        barWrapper.appendChild(bar);
+        barWrapper.appendChild(value);
+        
+        barContainer.appendChild(label);
+        barContainer.appendChild(barWrapper);
+        
+        chart.appendChild(barContainer);
+    });
+    
+    chartContainer.appendChild(chart);
+}
