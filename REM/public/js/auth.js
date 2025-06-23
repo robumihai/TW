@@ -97,16 +97,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.error) {
                     showMessage(registerMessage, data.error, 'error');
                 } else {
-                    // Save token in localStorage
-                    localStorage.setItem('token', data.token);
-                    
-                    // Show success message
-                    showMessage(registerMessage, 'Registration successful! Redirecting...', 'success');
-                    
-                    // Redirect after 1 second
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1000);
+                    // Nu salva tokenul și nu redirecționa automat
+                    showMessage(registerMessage, 'Registration successful! You can now <a href="/login">log in</a>.', 'success');
                 }
             })
             .catch(error => {

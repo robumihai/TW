@@ -127,7 +127,10 @@ class PropertyController {
             max_price,
             min_area,
             max_area,
-            facilities
+            facilities,
+            center_lat,
+            center_lng,
+            radius_km
         } = req.query;
 
         let conditions = [];
@@ -178,7 +181,29 @@ class PropertyController {
                 res.status(500).json({ error: err.message });
                 return;
             }
-            res.json(rows);
+            // Dacă avem filtrare pe județ (center_lat, center_lng, radius_km), filtrăm și după distanță
+            if (center_lat && center_lng && radius_km) {
+                const centerLat = parseFloat(center_lat);
+                const centerLng = parseFloat(center_lng);
+                const radius = parseFloat(radius_km);
+                // Funcție Haversine
+                function getDistanceKm(lat1, lon1, lat2, lon2) {
+                    const R = 6371;
+                    const dLat = (lat2 - lat1) * Math.PI / 180;
+                    const dLon = (lon2 - lon1) * Math.PI / 180;
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    return R * c;
+                }
+                const filtered = rows.filter(row => {
+                    return getDistanceKm(centerLat, centerLng, row.latitude, row.longitude) <= radius;
+                });
+                res.json(filtered);
+            } else {
+                res.json(rows);
+            }
         });
     }
 

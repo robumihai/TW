@@ -8,81 +8,105 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <header>
-        <h1>Real Estate Management</h1>
-        <nav>
+    <!-- Skip to main content for accessibility -->
+    <a href="#propertyList" class="visually-hidden focusable skip-link">Skip to main content</a>
+    <header role="banner">
+        <h1 id="site-title">Real Estate Management</h1>
+        <nav role="navigation" aria-label="Main navigation">
             <div class="nav-actions">
-                <button id="addPropertyBtn">Add Property</button>
-                <button id="filterBtn">Filter</button>
+                <button id="addPropertyBtn" aria-haspopup="dialog">Add Property</button>
+                <button id="filterBtn" aria-haspopup="dialog">Filter</button>
                 <button id="exportJsonBtn">Export JSON</button>
                 <button id="exportCsvBtn">Export CSV</button>
                 <button id="findNearbyBtn">Find Nearby</button>
-                <a href="/admin" class="admin-link">Admin Panel</a>
+                <a href="documentation.html" id="documentationBtn" class="btn" target="_blank" rel="noopener">Documentație</a>
+                <a href="/admin" class="admin-link" aria-label="Go to Admin Panel">Admin Panel</a>
             </div>
-            <div class="auth-actions" id="authLinks">
+            <div class="auth-actions" id="authLinks" aria-label="Authentication actions">
                 <!-- Authentication links will be inserted here via JavaScript -->
             </div>
         </nav>
     </header>
 
-    <main>
-        <div class="map-container">
-            <div id="map"></div>
-            <div class="map-layers">
+    <main id="main-content" tabindex="-1">
+        <div class="map-container" aria-label="Map and layers section">
+            <div id="map" aria-label="Property map" tabindex="0"></div>
+            <div class="layer-controls" aria-label="Map layer controls">
                 <h3>Map Layers</h3>
-                <div class="layer-controls">
-                    <label>
+                <div class="layer-group">
+                    <div class="layer-item">
                         <input type="checkbox" id="layer-pollution" class="layer-checkbox">
-                        Pollution Levels
-                    </label>
-                    <label>
+                        <label for="layer-pollution">Air Pollution</label>
+                    </div>
+                    <div class="layer-item">
                         <input type="checkbox" id="layer-crime" class="layer-checkbox">
-                        Crime Reports
-                    </label>
-                    <label>
+                        <label for="layer-crime">Crime Reports</label>
+                    </div>
+                    <div class="layer-item">
                         <input type="checkbox" id="layer-temperature" class="layer-checkbox">
-                        Average Temperature
-                    </label>
-                    <label>
+                        <label for="layer-temperature">Average Temperature</label>
+                    </div>
+                    <div class="layer-item">
+                        <input type="checkbox" id="layer-cost" class="layer-checkbox">
+                        <label for="layer-cost">Cost of Living</label>
+                    </div>
+                    <div class="layer-item">
                         <input type="checkbox" id="layer-parking" class="layer-checkbox">
-                        Parking Facilities
-                    </label>
-                    <label>
+                        <label for="layer-parking">Parking Spots</label>
+                    </div>
+                    <div class="layer-item">
                         <input type="checkbox" id="layer-shops" class="layer-checkbox">
-                        Shopping Centers
-                    </label>
-                    <label>
+                        <label for="layer-shops">Nearby Shops</label>
+                    </div>
+                    <div class="layer-item">
                         <input type="checkbox" id="layer-crowd" class="layer-checkbox">
-                        Crowding Level
-                    </label>
+                        <label for="layer-crowd">Crowding Level</label>
+                    </div>
                 </div>
             </div>
         </div>
-        <div id="propertyList">
+        <div id="propertyList" aria-live="polite">
+            <div class="sort-bar">
+                <label for="sortProperties" class="visually-hidden">Sort by</label>
+                <select id="sortProperties" aria-label="Sort properties">
+                    <option value="newest">Newest</option>
+                    <option value="price-asc">Price: Low to High</option>
+                    <option value="price-desc">Price: High to Low</option>
+                    <option value="area-asc">Area: Smallest First</option>
+                    <option value="area-desc">Area: Largest First</option>
+                </select>
+            </div>
             <h2>Available Properties</h2>
             <div id="properties"></div>
         </div>
     </main>
 
-    <div id="addPropertyModal" class="modal">
+    <div id="addPropertyModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="addPropertyTitle" style="display:none;">
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>Add New Property</h2>
-            <form id="propertyForm">
-                <input type="text" id="title" placeholder="Title" required>
-                <textarea id="description" placeholder="Description" required></textarea>
-                <input type="number" id="price" placeholder="Price" required>
-                <select id="type" required>
+            <button class="close" aria-label="Close add property modal">&times;</button>
+            <h2 id="addPropertyTitle">Add New Property</h2>
+            <form id="propertyForm" autocomplete="off">
+                <label for="title" class="visually-hidden">Title</label>
+                <input type="text" id="title" placeholder="Title" required aria-required="true">
+                <label for="description" class="visually-hidden">Description</label>
+                <textarea id="description" placeholder="Description" required aria-required="true"></textarea>
+                <label for="price" class="visually-hidden">Price</label>
+                <input type="number" id="price" placeholder="Price" required aria-required="true">
+                <label for="type" class="visually-hidden">Type</label>
+                <select id="type" required aria-required="true">
                     <option value="sale">For Sale</option>
                     <option value="rent">For Rent</option>
                 </select>
-                <select id="property_type" required>
+                <label for="property_type" class="visually-hidden">Property Type</label>
+                <select id="property_type" required aria-required="true">
                     <option value="apartment">Apartment</option>
                     <option value="house">House</option>
                     <option value="land">Land</option>
                     <option value="commercial">Commercial</option>
                 </select>
-                <input type="number" id="area" placeholder="Area (m²)" required>
+                <label for="area" class="visually-hidden">Area (m²)</label>
+                <input type="number" id="area" placeholder="Area (m²)" required aria-required="true">
+                <label for="building_condition" class="visually-hidden">Building Condition</label>
                 <select id="building_condition">
                     <option value="">Select Building Condition</option>
                     <option value="new">New</option>
@@ -90,12 +114,15 @@
                     <option value="needs_renovation">Needs Renovation</option>
                     <option value="under_construction">Under Construction</option>
                 </select>
+                <label for="facilities" class="visually-hidden">Facilities</label>
                 <textarea id="facilities" placeholder="Facilities (e.g., parking, elevator, garden)"></textarea>
+                <label for="risks" class="visually-hidden">Potential Risks</label>
                 <textarea id="risks" placeholder="Potential Risks"></textarea>
-                <input type="text" id="contact" placeholder="Contact Information" required>
+                <label for="contact" class="visually-hidden">Contact Information</label>
+                <input type="text" id="contact" placeholder="Contact Information" required aria-required="true">
                 <div class="form-group">
                     <label>Location (Click on map to set)</label>
-                    <div id="form-map"></div>
+                    <div id="form-map" aria-label="Set property location on map"></div>
                     <input type="hidden" id="latitude">
                     <input type="hidden" id="longitude">
                 </div>
@@ -104,16 +131,18 @@
         </div>
     </div>
 
-    <div id="filterModal" class="modal">
+    <div id="filterModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="filterTitle" style="display:none;">
         <div class="modal-content">
-            <span class="close filter-close">&times;</span>
-            <h2>Filter Properties</h2>
-            <form id="filterForm">
+            <button class="close filter-close" aria-label="Close filter modal">&times;</button>
+            <h2 id="filterTitle">Filter Properties</h2>
+            <form id="filterForm" autocomplete="off">
+                <label for="filter-type" class="visually-hidden">Type</label>
                 <select id="filter-type">
                     <option value="">All Types</option>
                     <option value="sale">For Sale</option>
                     <option value="rent">For Rent</option>
                 </select>
+                <label for="filter-property-type" class="visually-hidden">Property Type</label>
                 <select id="filter-property-type">
                     <option value="">All Property Types</option>
                     <option value="apartment">Apartment</option>
@@ -122,22 +151,90 @@
                     <option value="commercial">Commercial</option>
                 </select>
                 <div class="price-range">
+                    <label for="filter-min-price" class="visually-hidden">Min Price</label>
                     <input type="number" id="filter-min-price" placeholder="Min Price">
+                    <label for="filter-max-price" class="visually-hidden">Max Price</label>
                     <input type="number" id="filter-max-price" placeholder="Max Price">
                 </div>
                 <div class="area-range">
+                    <label for="filter-min-area" class="visually-hidden">Min Area (m²)</label>
                     <input type="number" id="filter-min-area" placeholder="Min Area (m²)">
+                    <label for="filter-max-area" class="visually-hidden">Max Area (m²)</label>
                     <input type="number" id="filter-max-area" placeholder="Max Area (m²)">
                 </div>
+                <label for="filter-facilities" class="visually-hidden">Facilities</label>
                 <input type="text" id="filter-facilities" placeholder="Facilities (e.g., parking, elevator)">
+                <label for="filter-county" class="visually-hidden">Județ</label>
+                <select id="filter-county">
+                    <option value="">Toate județele</option>
+                    <option value="București">București</option>
+                    <option value="Alba">Alba</option>
+                    <option value="Arad">Arad</option>
+                    <option value="Argeș">Argeș</option>
+                    <option value="Bacău">Bacău</option>
+                    <option value="Bihor">Bihor</option>
+                    <option value="Bistrița-Năsăud">Bistrița-Năsăud</option>
+                    <option value="Botoșani">Botoșani</option>
+                    <option value="Brăila">Brăila</option>
+                    <option value="Brașov">Brașov</option>
+                    <option value="Buzău">Buzău</option>
+                    <option value="Caraș-Severin">Caraș-Severin</option>
+                    <option value="Călărași">Călărași</option>
+                    <option value="Cluj">Cluj</option>
+                    <option value="Constanța">Constanța</option>
+                    <option value="Covasna">Covasna</option>
+                    <option value="Dâmbovița">Dâmbovița</option>
+                    <option value="Dolj">Dolj</option>
+                    <option value="Galați">Galați</option>
+                    <option value="Giurgiu">Giurgiu</option>
+                    <option value="Gorj">Gorj</option>
+                    <option value="Harghita">Harghita</option>
+                    <option value="Hunedoara">Hunedoara</option>
+                    <option value="Ialomița">Ialomița</option>
+                    <option value="Iași">Iași</option>
+                    <option value="Ilfov">Ilfov</option>
+                    <option value="Maramureș">Maramureș</option>
+                    <option value="Mehedinți">Mehedinți</option>
+                    <option value="Mureș">Mureș</option>
+                    <option value="Neamț">Neamț</option>
+                    <option value="Olt">Olt</option>
+                    <option value="Prahova">Prahova</option>
+                    <option value="Sălaj">Sălaj</option>
+                    <option value="Satu Mare">Satu Mare</option>
+                    <option value="Sibiu">Sibiu</option>
+                    <option value="Suceava">Suceava</option>
+                    <option value="Teleorman">Teleorman</option>
+                    <option value="Timiș">Timiș</option>
+                    <option value="Tulcea">Tulcea</option>
+                    <option value="Vâlcea">Vâlcea</option>
+                    <option value="Vaslui">Vaslui</option>
+                    <option value="Vrancea">Vrancea</option>
+                </select>
                 <button type="submit">Apply Filters</button>
                 <button type="reset" id="resetFilters">Reset Filters</button>
             </form>
         </div>
     </div>
 
+    <!-- Property Details Modal -->
+    <div id="propertyDetailsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="propertyDetailsTitle" style="display:none;">
+        <div class="modal-content">
+            <button class="close details-close" aria-label="Close property details modal">&times;</button>
+            <h2 id="propertyDetailsTitle">Property Details</h2>
+            <div id="propertyDetailsBody">
+                <!-- Details will be filled by JS -->
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="js/auth-utils.js"></script>
     <script src="js/main.js"></script>
+    <!-- Visually hidden utility class for accessibility -->
+    <style>
+    .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+    .focusable:active, .focusable:focus { position: static !important; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; }
+    .skip-link { background: #2563eb; color: #fff; padding: 8px 16px; z-index: 10000; left: 0; top: 0; text-decoration: none; border-radius: 0 0 8px 0; }
+    </style>
 </body>
 </html> 

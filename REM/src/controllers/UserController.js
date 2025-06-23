@@ -51,16 +51,9 @@ class UserController {
                             return res.status(500).json({ error: err.message });
                         }
                         
-                        // Generate JWT token
-                        const token = jwt.sign(
-                            { id: this.lastID, username, is_admin: 0 },
-                            JWT_SECRET,
-                            { expiresIn: '24h' }
-                        );
-                        
+                        // Nu mai genera token și nu mai loga automat utilizatorul
                         res.json({
-                            message: 'User registered successfully',
-                            token
+                            message: 'User registered successfully'
                         });
                     });
                 });

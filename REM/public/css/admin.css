@@ -151,13 +151,118 @@ tr:hover {
     border-radius: 4px;
 }
 
+/* Bar Chart Styles */
+.bar-chart {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.bar-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.bar-label {
+    flex: 0 0 120px;
+    font-weight: 500;
+    color: #333;
+    text-align: right;
+}
+
+.bar-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.bar {
+    height: 24px;
+    border-radius: 12px;
+    transition: width 0.4s cubic-bezier(.4,0,.2,1);
+    min-width: 2rem;
+}
+
+.bar-value {
+    min-width: 2.5rem;
+    text-align: left;
+    font-size: 1rem;
+    color: #222;
+    font-weight: 600;
+}
+
+@media (max-width: 600px) {
+    .bar-label {
+        flex: 0 0 80px;
+        font-size: 0.95rem;
+    }
+    .bar {
+        height: 18px;
+    }
+}
+
+/* Sidebar mobile improvements */
 @media (max-width: 768px) {
     .admin-main {
         grid-template-columns: 1fr;
     }
     
     .admin-sidebar {
-        height: auto;
-        margin-bottom: 1rem;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: #f5f5f5;
+        border-radius: 0 0 4px 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
+}
+
+@media (max-width: 900px) {
+  .admin-main {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  .admin-sidebar {
+    height: auto;
+    margin-bottom: 1rem;
+    min-width: 0;
+  }
+  .admin-content {
+    padding: 0.5rem;
+  }
+  .admin-table-container {
+    overflow-x: auto;
+  }
+}
+@media (max-width: 600px) {
+  .admin-main {
+    padding: 0.2rem;
+  }
+  .admin-sidebar {
+    padding: 0.5rem;
+    font-size: 0.98rem;
+  }
+  .admin-content {
+    padding: 0.2rem;
+  }
+  .admin-card, .stat-card {
+    padding: 0.5rem;
+    font-size: 0.98rem;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  table {
+    font-size: 0.97rem;
+  }
+  th, td {
+    padding: 0.4rem;
+  }
 }

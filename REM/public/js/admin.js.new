@@ -43,32 +43,51 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('importForm').addEventListener('submit', importProperties);
 });
 
+// Utility: Escape HTML for XSS prevention
+function escapeHtml(str) {
+    return String(str).replace(/[&<>'"`=\/]/g, function (s) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;','`':'&#96;','=':'&#61;','/':'&#47;'}[s]);
+    });
+}
+
 // Load properties for admin table
 async function loadProperties() {
     try {
         const response = await authenticatedFetch('/api/properties');
         if (!response) return;
-        
         const properties = await response.json();
         const tbody = document.getElementById('propertiesTableBody');
         tbody.innerHTML = '';
-        
         properties.forEach(property => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${property.id}</td>
-                <td>${property.title}</td>
-                <td>$${property.price.toLocaleString()}</td>
-                <td>${property.type === 'sale' ? 'For Sale' : 'For Rent'}</td>
-                <td>${property.property_type}</td>
-                <td>${property.area} m²</td>
-                <td>
-                    <button class="admin-btn delete-btn" data-id="${property.id}">Delete</button>
-                </td>
-            `;
+            // Use textContent for user data
+            const idTd = document.createElement('td');
+            idTd.textContent = property.id;
+            const titleTd = document.createElement('td');
+            titleTd.textContent = property.title;
+            const priceTd = document.createElement('td');
+            priceTd.textContent = `$${Number(property.price).toLocaleString()}`;
+            const typeTd = document.createElement('td');
+            typeTd.textContent = property.type === 'sale' ? 'For Sale' : 'For Rent';
+            const propertyTypeTd = document.createElement('td');
+            propertyTypeTd.textContent = property.property_type;
+            const areaTd = document.createElement('td');
+            areaTd.textContent = `${property.area} m²`;
+            const actionsTd = document.createElement('td');
+            const delBtn = document.createElement('button');
+            delBtn.className = 'admin-btn delete-btn';
+            delBtn.dataset.id = property.id;
+            delBtn.textContent = 'Delete';
+            actionsTd.appendChild(delBtn);
+            tr.appendChild(idTd);
+            tr.appendChild(titleTd);
+            tr.appendChild(priceTd);
+            tr.appendChild(typeTd);
+            tr.appendChild(propertyTypeTd);
+            tr.appendChild(areaTd);
+            tr.appendChild(actionsTd);
             tbody.appendChild(tr);
         });
-        
         // Add event listeners to delete buttons
         document.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', function() {
@@ -106,72 +125,78 @@ async function deleteProperty(id) {
     }
 }
 
-// Import properties
+// Import properties (supports JSON and CSV)
 async function importProperties(e) {
     e.preventDefault();
-    
     const fileInput = document.getElementById('importFile');
     const file = fileInput.files[0];
-    
     if (!file) {
         alert('Please select a file');
         return;
     }
-    
-    if (file.type !== 'application/json') {
-        alert('Please select a JSON file');
+    const isJson = file.type === 'application/json' || file.name.endsWith('.json');
+    const isCsv = file.type === 'text/csv' || file.name.endsWith('.csv');
+    if (!isJson && !isCsv) {
+        alert('Please select a JSON or CSV file');
         return;
     }
-    
     try {
         const reader = new FileReader();
-        
         reader.onload = async function(e) {
             try {
-                const properties = JSON.parse(e.target.result);
-                
+                let properties;
+                if (isJson) {
+                    properties = JSON.parse(e.target.result);
+                } else if (isCsv) {
+                    properties = csvToJson(e.target.result);
+                }
+                if (!Array.isArray(properties)) {
+                    throw new Error('Invalid data format: expected an array of properties');
+                }
                 const response = await authenticatedFetch('/api/import/json', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(properties)
                 });
-                
                 if (!response) return;
-                
                 const result = await response.json();
-                
+                const importResult = document.getElementById('importResult');
                 if (result.error) {
-                    document.getElementById('importResult').innerHTML = `
-                        <div class="error">${result.error}</div>
-                    `;
+                    importResult.innerHTML = `<div class="error"></div>`;
+                    importResult.querySelector('.error').textContent = result.error;
                 } else {
-                    document.getElementById('importResult').innerHTML = `
-                        <div class="success">
-                            Import completed:<br>
-                            - ${result.success} properties imported successfully<br>
-                            - ${result.errors} errors
-                        </div>
-                    `;
+                    importResult.innerHTML = `<div class="success"></div>`;
+                    importResult.querySelector('.success').textContent = `Import completed: ${result.success} properties imported successfully, ${result.errors} errors`;
                     loadProperties();
                     loadStatistics();
                 }
             } catch (error) {
-                console.error('Error parsing JSON:', error);
-                document.getElementById('importResult').innerHTML = `
-                    <div class="error">Invalid JSON format</div>
-                `;
+                console.error('Error parsing file:', error);
+                const importResult = document.getElementById('importResult');
+                importResult.innerHTML = `<div class="error"></div>`;
+                importResult.querySelector('.error').textContent = 'Invalid file format';
             }
         };
-        
         reader.readAsText(file);
     } catch (error) {
         console.error('Error reading file:', error);
-        document.getElementById('importResult').innerHTML = `
-            <div class="error">Error reading file</div>
-        `;
+        const importResult = document.getElementById('importResult');
+        importResult.innerHTML = `<div class="error"></div>`;
+        importResult.querySelector('.error').textContent = 'Error reading file';
     }
+}
+
+// CSV to JSON utility (simple, secure, no external libs)
+function csvToJson(csv) {
+    const lines = csv.split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(',').map(h => h.trim());
+    return lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = values[i] || ''; });
+        return obj;
+    });
 }
 
 // Load statistics

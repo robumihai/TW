@@ -129,12 +129,11 @@ app.get('/api/auth/profile', UserController.getProfile);
 
 // Properties routes
 app.get('/api/properties', PropertyController.getAllProperties);
+app.get('/api/properties/filter', PropertyController.filterProperties);
+app.get('/api/properties/nearby', PropertyController.findNearbyProperties);
 app.get('/api/properties/:id', PropertyController.getPropertyById);
 app.post('/api/properties', PropertyController.addProperty);
 app.delete('/api/properties/:id', PropertyController.deleteProperty);
-
-app.get('/api/properties/filter', PropertyController.filterProperties);
-app.get('/api/properties/nearby', PropertyController.findNearbyProperties);
 
 // Export/Import routes
 app.get('/api/export/json', PropertyController.exportAsJson);

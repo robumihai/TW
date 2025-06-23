@@ -8,26 +8,28 @@
     <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
-    <header>
-        <h1>Real Estate Management - Admin Panel</h1>
-        <nav>
-            <a href="/" class="btn">Back to Main Site</a>
+    <!-- Skip to main content for accessibility -->
+    <a href="#propertiesTable" class="visually-hidden focusable skip-link">Skip to main content</a>
+    <header role="banner">
+        <h1 id="admin-title">Real Estate Management - Admin Panel</h1>
+        <nav role="navigation" aria-label="Admin navigation">
+            <a href="/" class="btn" aria-label="Back to Main Site">Back to Main Site</a>
         </nav>
     </header>
 
-    <main class="admin-main">
-        <div class="admin-sidebar">
+    <main class="admin-main" id="main-content" tabindex="-1">
+        <div class="admin-sidebar" aria-label="Admin menu">
             <h2>Admin Menu</h2>
             <ul>
-                <li><a href="#properties" class="active">Properties</a></li>
+                <li><a href="#properties" class="active" aria-current="page">Properties</a></li>
                 <li><a href="#import-export">Import/Export</a></li>
                 <li><a href="#statistics">Statistics</a></li>
             </ul>
         </div>
 
         <div class="admin-content">
-            <section id="properties" class="admin-section active">
-                <h2>Manage Properties</h2>
+            <section id="properties" class="admin-section active" aria-labelledby="managePropertiesTitle">
+                <h2 id="managePropertiesTitle">Manage Properties</h2>
                 <button id="refreshProperties" class="admin-btn">Refresh List</button>
                 <div class="admin-table-container">
                     <table id="propertiesTable">
@@ -49,8 +51,8 @@
                 </div>
             </section>
 
-            <section id="import-export" class="admin-section">
-                <h2>Import/Export Data</h2>
+            <section id="import-export" class="admin-section" aria-labelledby="importExportTitle">
+                <h2 id="importExportTitle">Import/Export Data</h2>
                 
                 <div class="admin-card">
                     <h3>Export Data</h3>
@@ -63,17 +65,18 @@
                 
                 <div class="admin-card">
                     <h3>Import Data</h3>
-                    <p>Upload property data in JSON format:</p>
+                    <p>Upload property data in JSON or CSV format:</p>
                     <form id="importForm">
-                        <input type="file" id="importFile" accept=".json">
+                        <input type="file" id="importFile" accept=".json,.csv">
                         <button type="submit" class="admin-btn">Import</button>
                     </form>
                     <div id="importResult"></div>
+                    <div class="helper-text">Supported formats: <strong>JSON</strong> (array of property objects) or <strong>CSV</strong> (header row required). Data will be validated before import.</div>
                 </div>
             </section>
 
-            <section id="statistics" class="admin-section">
-                <h2>Statistics</h2>
+            <section id="statistics" class="admin-section" aria-labelledby="statisticsTitle">
+                <h2 id="statisticsTitle">Statistics</h2>
                 
                 <div class="stats-grid">
                     <div class="stat-card">
@@ -99,7 +102,7 @@
                 
                 <div class="admin-card">
                     <h3>Property Types Distribution</h3>
-                    <div id="propertyTypeChart" class="chart-container">
+                    <div id="propertyTypeChart" class="chart-container" aria-label="Property type distribution chart">
                         <!-- Chart will be rendered here -->
                     </div>
                 </div>
@@ -121,5 +124,13 @@
             }
         });
     </script>
+
+    <!-- Visually hidden utility class for accessibility -->
+    <style>
+    .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+    .focusable:active, .focusable:focus { position: static !important; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; }
+    .skip-link { background: #2563eb; color: #fff; padding: 8px 16px; z-index: 10000; left: 0; top: 0; text-decoration: none; border-radius: 0 0 8px 0; }
+    .helper-text { color: #555; font-size: 0.95rem; margin-top: 0.5rem; }
+    </style>
 </body>
 </html> 
