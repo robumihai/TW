@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Aplicație web pentru gestionarea tranzacțiilor imobiliare - apartamente, case, terenuri">
+    <meta name="keywords" content="imobiliare, apartamente, case, închiriere, vânzare, real estate">
+    <meta name="author" content="Real Estate Management System">
+    
+    <!-- Prevenire XSS prin Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https: http:; connect-src 'self' https: http:;">
+    
+    <title>REMS - Real Estate Management System</title>
+    
+    <!-- CSS Files -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="css/components.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico">
+</head>
+<body>
+    <!-- Header Section -->
+    <header class="header" role="banner">
+        <nav class="navbar" role="navigation" aria-label="Navigare principală">
+            <div class="nav-container">
+                <!-- Logo -->
+                <div class="nav-logo">
+                    <a href="index.html" aria-label="Acasă - REMS">
+                        <h1>REMS</h1>
+                        <span>Real Estate Management</span>
+                    </a>
+                </div>
+                
+                <!-- Navigation Menu -->
+                <ul class="nav-menu" id="navMenu">
+                    <li><a href="index.html" class="nav-link active">Acasă</a></li>
+                    <li><a href="pages/properties.html" class="nav-link">Proprietăți</a></li>
+                    <li><a href="pages/map.html" class="nav-link">Hartă</a></li>
+                    <li><a href="pages/compare.html" class="nav-link">Compară Zone</a></li>
+                    <li class="nav-auth">
+                        <a href="pages/login.html" class="btn btn-outline">Conectează-te</a>
+                        <a href="pages/register.html" class="btn btn-primary">Înregistrează-te</a>
+                    </li>
+                </ul>
+                
+                <!-- Mobile Menu Toggle -->
+                <button class="nav-toggle" id="navToggle" aria-label="Deschide meniul de navigare">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content" role="main">
+        <!-- Hero Section -->
+        <section class="hero" aria-labelledby="hero-title">
+            <div class="hero-container">
+                <div class="hero-content">
+                    <h2 id="hero-title">Găsește proprietatea perfectă</h2>
+                    <p class="hero-description">
+                        Explorează o gamă largă de apartamente, case și terenuri disponibile pentru vânzare sau închiriere. 
+                        Folosește harta interactivă pentru a descoperi informații detaliate despre zonă.
+                    </p>
+                    
+                    <!-- Search Quick Access -->
+                    <div class="hero-search">
+                        <form class="search-form" role="search" aria-label="Căutare rapidă proprietăți">
+                            <div class="search-field">
+                                <label for="quick-search" class="sr-only">Căutare proprietăți</label>
+                                <input type="text" id="quick-search" name="search" placeholder="Căutare după locație, tip proprietate...">
+                            </div>
+                            <div class="search-filters">
+                                <select name="type" aria-label="Tip proprietate">
+                                    <option value="">Tip proprietate</option>
+                                    <option value="apartament">Apartament</option>
+                                    <option value="casa">Casă</option>
+                                    <option value="teren">Teren</option>
+                                    <option value="comercial">Spațiu comercial</option>
+                                </select>
+                                <select name="transaction" aria-label="Tip tranzacție">
+                                    <option value="">Tip tranzacție</option>
+                                    <option value="vanzare">Vânzare</option>
+                                    <option value="inchiriere">Închiriere</option>
+                                </select>
+                                <button type="submit" class="btn btn-primary">
+                                    <span>Caută</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- CTA Buttons -->
+                    <div class="hero-actions">
+                        <a href="pages/map.html" class="btn btn-large btn-primary">
+                            Explorează Harta
+                        </a>
+                        <a href="pages/properties.html" class="btn btn-large btn-outline">
+                            Vezi Toate Proprietățile
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Hero Image/Map Preview -->
+                <div class="hero-visual">
+                    <div class="map-preview" id="mapPreview">
+                        <div class="map-placeholder">
+                            <p>Previzualizare hartă interactivă</p>
+                            <small>Click pentru a deschide harta completă</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features" aria-labelledby="features-title">
+            <div class="container">
+                <h2 id="features-title">De ce să alegi REMS?</h2>
+                <div class="features-grid">
+                    <article class="feature-card">
+                        <div class="feature-icon">🗺️</div>
+                        <h3>Hartă Interactivă</h3>
+                        <p>Explorează proprietățile pe o hartă interactivă cu informații detaliate despre zonă, transport și facilități.</p>
+                    </article>
+                    
+                    <article class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h3>Straturi de Date</h3>
+                        <p>Vizualizează date despre poluare, criminalitate, transport public și alte informații relevante pentru decizia ta.</p>
+                    </article>
+                    
+                    <article class="feature-card">
+                        <div class="feature-icon">🔍</div>
+                        <h3>Căutare Avansată</h3>
+                        <p>Filtrează proprietățile după preț, suprafață, număr de camere și multe alte criterii pentru a găsi exact ce cauți.</p>
+                    </article>
+                    
+                    <article class="feature-card">
+                        <div class="feature-icon">📱</div>
+                        <h3>Design Responsiv</h3>
+                        <p>Accesează aplicația de pe orice dispozitiv - desktop, tabletă sau telefon mobil.</p>
+                    </article>
+                    
+                    <article class="feature-card">
+                        <div class="feature-icon">🔒</div>
+                        <h3>Securitate</h3>
+                        <p>Datele tale sunt în siguranță cu tehnologii moderne de criptare și protecție împotriva atacurilor.</p>
+                    </article>
+                    
+                    <article class="feature-card">
+                        <div class="feature-icon">📤</div>
+                        <h3>Export Date</h3>
+                        <p>Exportă listele de proprietăți în format CSV sau JSON pentru analize ulterioare.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section class="stats" aria-labelledby="stats-title">
+            <div class="container">
+                <h2 id="stats-title" class="sr-only">Statistici platformă</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number" data-count="1250">0</div>
+                        <div class="stat-label">Proprietăți Active</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" data-count="350">0</div>
+                        <div class="stat-label">Utilizatori Înregistrați</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" data-count="89">0</div>
+                        <div class="stat-label">Tranzacții Finalizate</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" data-count="15">0</div>
+                        <div class="stat-label">Agenți Parteneri</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer" role="contentinfo">
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>REMS</h3>
+                    <p>Platforma modernă pentru gestionarea eficientă a tranzacțiilor imobiliare.</p>
+                    <div class="footer-social">
+                        <a href="#" aria-label="Facebook">📘</a>
+                        <a href="#" aria-label="Twitter">🐦</a>
+                        <a href="#" aria-label="LinkedIn">💼</a>
+                    </div>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Navigare</h4>
+                    <ul>
+                        <li><a href="index.html">Acasă</a></li>
+                        <li><a href="pages/properties.html">Proprietăți</a></li>
+                        <li><a href="pages/map.html">Hartă</a></li>
+                        <li><a href="pages/compare.html">Compară Zone</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Cont</h4>
+                    <ul>
+                        <li><a href="pages/login.html">Conectează-te</a></li>
+                        <li><a href="pages/register.html">Înregistrează-te</a></li>
+                        <li><a href="pages/dashboard.html">Dashboard</a></li>
+                        <li><a href="admin/">Admin</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Suport</h4>
+                    <ul>
+                        <li><a href="docs/USER_GUIDE.md">Ghid utilizator</a></li>
+                        <li><a href="docs/API_DOCUMENTATION.md">API</a></li>
+                        <li><a href="mailto:support@rems.ro">Contact</a></li>
+                        <li><a href="#privacy">Confidențialitate</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2024 REMS - Real Estate Management System. Toate drepturile rezervate.</p>
+                <p>Dezvoltat cu ❤️ folosind tehnologii web moderne și open source.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript Files -->
+    <script src="js/main.js"></script>
+    
+    <!-- Loading Indicator -->
+    <div id="loading" class="loading hidden" aria-hidden="true">
+        <div class="loading-spinner"></div>
+        <p>Se încarcă...</p>
+    </div>
+</body>
+</html> 
