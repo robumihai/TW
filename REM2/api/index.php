@@ -1,353 +1,281 @@
 <?php
 /**
  * REMS - Real Estate Management System
- * API Entry Point
+ * Main API Router - Enhanced for Stage 4
  * 
- * Main router and middleware handler for the REST API
+ * Central API entry point with comprehensive routing,
+ * security, and error handling
  */
 
 declare(strict_types=1);
 
-// Error reporting configuration
+// Set error reporting for development
 error_reporting(E_ALL);
 ini_set('display_errors', '0'); // Don't display errors to users
-ini_set('log_errors', '1');
 
-// Include required files
+// Set content type to JSON
+header('Content-Type: application/json; charset=utf-8');
+
+// Include autoloader and dependencies
 require_once __DIR__ . '/utils/Response.php';
 require_once __DIR__ . '/utils/Security.php';
+require_once __DIR__ . '/models/Database.php';
 
-// Global exception handler
-set_exception_handler([Response::class, 'handleException']);
-
-// Global error handler
-set_error_handler(function ($severity, $message, $file, $line) {
-    if (!(error_reporting() & $severity)) {
-        return false;
-    }
-    throw new ErrorException($message, 0, $severity, $file, $line);
-});
+// Initialize core components
+$response = new Response();
+$security = Security::getInstance();
 
 try {
-    // Initialize security
-    $security = Security::getInstance();
-    $security->initialize();
+    // Apply global security headers
+    $security->setSecurityHeaders();
     
-    // Handle CORS preflight requests
-    Response::handleOptions();
+    // Handle CORS for all requests
+    $response->cors();
     
-    // Set response headers
-    Response::setHeaders();
-    
-    // Get request information
-    $method = Response::getMethod();
-    $uri = Response::getUri();
-    $input = Response::getInput();
-    
-    // Remove API prefix from URI
-    $uri = preg_replace('#^/api#', '', $uri);
-    $uri = $uri ?: '/';
-    
-    // Rate limiting
-    $clientIP = $security->getClientIP();
-    if (!$security->checkRateLimit($clientIP, 'api')) {
-        Response::rateLimitExceeded('Too many requests. Please try again later.');
+    // Handle preflight requests
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(200);
+        exit;
     }
     
-    // Basic request validation
-    if (!Response::isAjax() && $method !== 'GET') {
-        // Allow non-AJAX requests for development/testing
-        $devMode = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']);
-        if (!$devMode) {
-            Response::forbidden('Only AJAX requests are allowed');
-        }
+    // Parse the request path
+    $requestUri = $_SERVER['REQUEST_URI'];
+    $path = parse_url($requestUri, PHP_URL_PATH);
+    $pathParts = explode('/', trim($path, '/'));
+    
+    // Remove 'api' from path if present
+    if (isset($pathParts[0]) && $pathParts[0] === 'api') {
+        array_shift($pathParts);
     }
     
-    // Route the request
-    route($method, $uri, $input, $security);
+    // Get the main resource/endpoint
+    $resource = $pathParts[0] ?? '';
     
-} catch (Throwable $e) {
-    Response::handleException($e);
-}
-
-/**
- * Simple router function
- */
-function route(string $method, string $uri, array $input, Security $security): void
-{
-    // Split URI into segments
-    $segments = array_filter(explode('/', trim($uri, '/')));
-    $resource = $segments[0] ?? '';
-    $id = $segments[1] ?? null;
-    $action = $segments[2] ?? null;
+    // Global rate limiting
+    if (!$security->checkRateLimit('global_api', 200, 3600)) {
+        $response->error('Global rate limit exceeded. Please try again later.', 429);
+    }
+    
+    // Log API request for monitoring
+    logApiRequest($_SERVER['REQUEST_METHOD'], $path, $_SERVER['REMOTE_ADDR'] ?? 'unknown');
     
     // Route to appropriate handler
     switch ($resource) {
-        case '':
-        case 'status':
-            handleStatus();
-            break;
-            
         case 'properties':
-            requireFile(__DIR__ . '/routes/properties.php');
-            handleProperties($method, $id, $action, $input, $security);
+            require_once __DIR__ . '/routes/properties.php';
             break;
             
         case 'auth':
-            requireFile(__DIR__ . '/routes/auth.php');
-            handleAuth($method, $id, $input, $security);
+            require_once __DIR__ . '/routes/auth.php';
             break;
             
-        case 'search':
-            requireFile(__DIR__ . '/routes/properties.php');
-            handleSearch($method, $input, $security);
+        case 'health':
+            handleHealthCheck($response);
             break;
             
-        case 'config':
-            handleConfig($method);
+        case 'info':
+            handleApiInfo($response);
             break;
             
-        case 'stats':
-            requireFile(__DIR__ . '/routes/properties.php');
-            handleStats($method, $security);
+        case 'test':
+            handleTestEndpoint($response, $security);
+            break;
+            
+        case '':
+            // Root API endpoint - return API information
+            handleApiRoot($response);
             break;
             
         default:
-            Response::notFound('API endpoint not found');
-    }
-}
-
-/**
- * Safely require a file
- */
-function requireFile(string $filePath): void
-{
-    if (!file_exists($filePath)) {
-        Response::serverError('Route handler not found');
-    }
-    require_once $filePath;
-}
-
-/**
- * Handle API status endpoint
- */
-function handleStatus(): void
-{
-    if (Response::getMethod() !== 'GET') {
-        Response::methodNotAllowed();
+            $response->error("Resource '$resource' not found", 404);
     }
     
+} catch (Exception $e) {
+    // Log the error
+    error_log("API Error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
+    
+    // Return generic error to user
+    $response->error('Internal server error occurred', 500);
+}
+
+/**
+ * Handle health check endpoint
+ */
+function handleHealthCheck(Response $response): void
+{
     try {
         // Check database connection
         $db = Database::getInstance();
-        $dbSize = $db->getDatabaseSize();
+        $db->queryScalar("SELECT 1");
         
-        $status = [
-            'api' => 'REMS API v1.0',
+        $health = [
             'status' => 'healthy',
             'timestamp' => date('c'),
-            'server' => [
-                'php_version' => PHP_VERSION,
-                'memory_usage' => memory_get_usage(true),
-                'memory_peak' => memory_get_peak_usage(true),
-            ],
-            'database' => [
-                'connection' => 'OK',
-                'size' => $dbSize,
-                'size_formatted' => formatBytes($dbSize),
-            ],
+            'version' => '1.0.0',
+            'stage' => 4,
+            'services' => [
+                'database' => 'healthy',
+                'api' => 'healthy'
+            ]
         ];
         
-        Response::success($status, 'API is healthy');
+        $response->success($health);
         
     } catch (Exception $e) {
-        $status = [
-            'api' => 'REMS API v1.0',
-            'status' => 'error',
-            'timestamp' => date('c'),
-            'error' => $e->getMessage(),
-        ];
-        
-        Response::error('API health check failed', Response::HTTP_SERVICE_UNAVAILABLE, $status);
+        $response->error('Service unhealthy: ' . $e->getMessage(), 503);
     }
 }
 
 /**
- * Handle configuration endpoint (public configurations only)
+ * Handle API info endpoint
  */
-function handleConfig(string $method): void
+function handleApiInfo(Response $response): void
 {
-    if ($method !== 'GET') {
-        Response::methodNotAllowed();
-    }
-    
-    try {
-        $db = Database::getInstance();
-        $publicConfigs = $db->query(
-            "SELECT config_key, config_value, config_type FROM site_config WHERE is_public = 1"
-        );
-        
-        $config = [];
-        foreach ($publicConfigs as $configItem) {
-            $value = $configItem['config_value'];
-            
-            // Convert value based on type
-            switch ($configItem['config_type']) {
-                case 'integer':
-                    $value = (int) $value;
-                    break;
-                case 'boolean':
-                    $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-                    break;
-                case 'json':
-                    $value = json_decode($value, true);
-                    break;
-            }
-            
-            $config[$configItem['config_key']] = $value;
-        }
-        
-        Response::success($config, 'Configuration retrieved successfully');
-        
-    } catch (Exception $e) {
-        Response::serverError('Failed to retrieve configuration');
-    }
-}
-
-/**
- * Format bytes to human readable format
- */
-function formatBytes(int $bytes, int $precision = 2): string
-{
-    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    
-    for ($i = 0; $bytes > 1024 && $i < count($units) - 1; $i++) {
-        $bytes /= 1024;
-    }
-    
-    return round($bytes, $precision) . ' ' . $units[$i];
-}
-
-/**
- * Check if user is authenticated (middleware)
- */
-function requireAuth(Security $security): array
-{
-    if (!isset($_SESSION['user_id'])) {
-        Response::unauthorized('Authentication required');
-    }
-    
-    // Get user info from database
-    $db = Database::getInstance();
-    $user = $db->queryOne(
-        "SELECT id, username, email, first_name, last_name, role, status FROM users WHERE id = ?",
-        [$_SESSION['user_id']]
-    );
-    
-    if (!$user) {
-        // Invalid session - user doesn't exist
-        session_destroy();
-        Response::unauthorized('Invalid session');
-    }
-    
-    if ($user['status'] !== 'active') {
-        Response::forbidden('Account is not active');
-    }
-    
-    return $user;
-}
-
-/**
- * Check if user has required role (middleware)
- */
-function requireRole(string $role, Security $security): array
-{
-    $user = requireAuth($security);
-    
-    $roleHierarchy = [
-        'user' => 1,
-        'agent' => 2,
-        'admin' => 3,
+    $info = [
+        'name' => 'REMS API',
+        'description' => 'Real Estate Management System API',
+        'version' => '1.0.0',
+        'stage' => 4,
+        'endpoints' => [
+            'properties' => [
+                'GET /api/properties' => 'Search properties with filters',
+                'GET /api/properties/featured' => 'Get featured properties',
+                'GET /api/properties/statistics' => 'Get property statistics',
+                'GET /api/properties/map' => 'Get properties for map display',
+                'GET /api/properties/cities' => 'Get available cities',
+                'GET /api/properties/types' => 'Get property types',
+                'GET /api/properties/{id}' => 'Get property by ID',
+                'GET /api/properties/{slug}' => 'Get property by slug'
+            ],
+            'auth' => [
+                'POST /api/auth/login' => 'User login (Stage 6)',
+                'POST /api/auth/register' => 'User registration (Stage 6)',
+                'POST /api/auth/logout' => 'User logout (Stage 6)'
+            ],
+            'utility' => [
+                'GET /api/health' => 'Health check',
+                'GET /api/info' => 'API information',
+                'GET /api/test' => 'Test endpoint'
+            ]
+        ],
+        'features' => [
+            'Advanced property search',
+            'Geographic filtering',
+            'Map integration',
+            'Property statistics',
+            'Image management (Stage 6)',
+            'User authentication (Stage 6)',
+            'Favorites system (Stage 6)',
+            'Export functionality (Stage 6)'
+        ]
     ];
     
-    $userLevel = $roleHierarchy[$user['role']] ?? 0;
-    $requiredLevel = $roleHierarchy[$role] ?? 999;
-    
-    if ($userLevel < $requiredLevel) {
-        Response::forbidden('Insufficient permissions');
-    }
-    
-    return $user;
+    $response->success($info);
 }
 
 /**
- * Validate CSRF token (middleware)
+ * Handle API root endpoint
  */
-function validateCSRF(Security $security): void
+function handleApiRoot(Response $response): void
 {
-    $method = Response::getMethod();
+    $welcome = [
+        'message' => 'Welcome to REMS API',
+        'version' => '1.0.0',
+        'stage' => 4,
+        'documentation' => '/api/info',
+        'health' => '/api/health',
+        'endpoints' => [
+            'properties' => '/api/properties',
+            'auth' => '/api/auth'
+        ]
+    ];
     
-    // Only validate CSRF for state-changing methods
-    if (!in_array($method, ['POST', 'PUT', 'DELETE', 'PATCH'])) {
-        return;
-    }
-    
-    $token = Response::getHeader('X-CSRF-Token') ?? '';
-    
-    if (!$security->validateCSRFToken($token)) {
-        Response::forbidden('Invalid CSRF token');
-    }
+    $response->success($welcome);
 }
 
 /**
- * Validate request content type for JSON endpoints
+ * Handle test endpoint for development
  */
-function validateContentType(): void
+function handleTestEndpoint(Response $response, Security $security): void
 {
-    $method = Response::getMethod();
+    $tests = [
+        'timestamp' => date('c'),
+        'method' => $_SERVER['REQUEST_METHOD'],
+        'headers' => [
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+            'accept' => $_SERVER['HTTP_ACCEPT'] ?? 'unknown'
+        ],
+        'security' => [
+            'csrf_token_generated' => $security->generateCsrfToken(),
+            'client_ip' => $security->getClientIp(),
+            'rate_limit_remaining' => 100 // Placeholder
+        ],
+        'database' => 'not_tested'
+    ];
     
-    if (in_array($method, ['POST', 'PUT', 'PATCH'])) {
-        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
-        
-        if (strpos($contentType, 'application/json') === false && 
-            strpos($contentType, 'multipart/form-data') === false &&
-            strpos($contentType, 'application/x-www-form-urlencoded') === false) {
-            
-            Response::error(
-                'Content-Type must be application/json, multipart/form-data, or application/x-www-form-urlencoded',
-                Response::HTTP_BAD_REQUEST
-            );
-        }
-    }
-}
-
-/**
- * Log API request for analytics
- */
-function logRequest(string $endpoint, ?array $user = null): void
-{
+    // Test database connection
     try {
         $db = Database::getInstance();
-        
-        $logData = [
-            'user_id' => $user['id'] ?? null,
-            'action' => 'api_request',
-            'resource_type' => 'api',
-            'resource_id' => null,
-            'ip_address' => Security::getInstance()->getClientIP(),
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
-            'details' => json_encode([
-                'endpoint' => $endpoint,
-                'method' => Response::getMethod(),
-                'timestamp' => date('c'),
-            ]),
-            'created_at' => date('Y-m-d H:i:s'),
+        $propertiesCount = $db->queryScalar("SELECT COUNT(*) FROM properties");
+        $tests['database'] = [
+            'status' => 'connected',
+            'properties_count' => (int)$propertiesCount
         ];
-        
-        $db->insert('activity_logs', $logData);
-        
     } catch (Exception $e) {
-        // Don't fail the request if logging fails
-        error_log("Failed to log API request: " . $e->getMessage());
+        $tests['database'] = [
+            'status' => 'error',
+            'message' => $e->getMessage()
+        ];
     }
+    
+    $response->success($tests);
+}
+
+/**
+ * Log API requests for monitoring
+ */
+function logApiRequest(string $method, string $path, string $ip): void
+{
+    $logEntry = sprintf(
+        "[%s] %s %s from %s\n",
+        date('Y-m-d H:i:s'),
+        $method,
+        $path,
+        $ip
+    );
+    
+    $logFile = __DIR__ . '/../logs/api.log';
+    $logDir = dirname($logFile);
+    
+    // Create logs directory if it doesn't exist
+    if (!is_dir($logDir)) {
+        mkdir($logDir, 0755, true);
+    }
+    
+    // Log the request
+    file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+}
+
+/**
+ * Log errors with context
+ */
+function logError(string $message, array $context = []): void
+{
+    $logEntry = sprintf(
+        "[%s] ERROR: %s\nContext: %s\n\n",
+        date('Y-m-d H:i:s'),
+        $message,
+        json_encode($context, JSON_PRETTY_PRINT)
+    );
+    
+    $logFile = __DIR__ . '/../logs/errors.log';
+    $logDir = dirname($logFile);
+    
+    // Create logs directory if it doesn't exist
+    if (!is_dir($logDir)) {
+        mkdir($logDir, 0755, true);
+    }
+    
+    // Log the error
+    file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
 } 

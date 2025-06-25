@@ -15,29 +15,16 @@ PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
-    role ENUM('admin', 'agent', 'user') DEFAULT 'user',
-    status ENUM('active', 'inactive', 'pending') DEFAULT 'pending',
-    email_verified BOOLEAN DEFAULT FALSE,
-    email_verification_token VARCHAR(255),
-    password_reset_token VARCHAR(255),
-    password_reset_expires DATETIME,
-    login_attempts INTEGER DEFAULT 0,
-    locked_until DATETIME,
-    last_login DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Indexes for performance
-    INDEX idx_users_email (email),
-    INDEX idx_users_username (username),
-    INDEX idx_users_role (role),
-    INDEX idx_users_status (status)
+    role TEXT CHECK(role IN ('admin', 'agent', 'user')) DEFAULT 'user',
+    status TEXT CHECK(status IN ('active', 'inactive', 'pending', 'suspended')) DEFAULT 'pending',
+    avatar VARCHAR(255),
+    email_verified_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==========================================================================
@@ -48,84 +35,63 @@ CREATE TABLE IF NOT EXISTS properties (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     title VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE NOT NULL,
     description TEXT,
+    short_description VARCHAR(500),
     
     -- Property details
-    property_type ENUM('apartament', 'casa', 'teren', 'comercial', 'birou', 'garsoniera') NOT NULL,
-    transaction_type ENUM('vanzare', 'inchiriere') NOT NULL,
-    price DECIMAL(12,2) NOT NULL,
+    property_type TEXT CHECK(property_type IN ('apartment', 'house', 'studio', 'villa', 'duplex', 'penthouse', 'office', 'commercial', 'industrial', 'land', 'garage', 'warehouse')) NOT NULL,
+    transaction_type TEXT CHECK(transaction_type IN ('sale', 'rent')) NOT NULL,
+    
+    -- Pricing
+    price DECIMAL(15,2) NOT NULL,
     currency VARCHAR(3) DEFAULT 'RON',
+    price_per_sqm DECIMAL(10,2),
     
     -- Location
-    address VARCHAR(500) NOT NULL,
+    address VARCHAR(255) NOT NULL,
     city VARCHAR(100) NOT NULL,
-    county VARCHAR(100) NOT NULL,
+    county VARCHAR(100),
     postal_code VARCHAR(20),
-    latitude DECIMAL(10, 8),
-    longitude DECIMAL(11, 8),
+    country VARCHAR(100) DEFAULT 'Romania',
+    latitude DECIMAL(10,8),
+    longitude DECIMAL(11,8),
     
     -- Property specifications
-    surface_total DECIMAL(8,2), -- Total surface in sqm
-    surface_useful DECIMAL(8,2), -- Useful surface in sqm
+    surface_total DECIMAL(8,2),
+    surface_useful DECIMAL(8,2),
     rooms INTEGER,
     bedrooms INTEGER,
     bathrooms INTEGER,
     floor INTEGER,
     total_floors INTEGER,
     construction_year INTEGER,
+    condition_type TEXT CHECK(condition_type IN ('new', 'excellent', 'very_good', 'good', 'renovated', 'needs_renovation', 'undeveloped')),
+    heating_type VARCHAR(50),
+    parking_spaces INTEGER DEFAULT 0,
     
-    -- Property condition and features
-    condition_type ENUM('nou', 'foarte_bun', 'bun', 'satisfacator', 'renovare') DEFAULT 'bun',
-    heating_type ENUM('centrala_proprie', 'centrala_bloc', 'termoficare', 'soba', 'aer_conditionat', 'altele'),
-    parking BOOLEAN DEFAULT FALSE,
-    balcony BOOLEAN DEFAULT FALSE,
-    terrace BOOLEAN DEFAULT FALSE,
-    garden BOOLEAN DEFAULT FALSE,
-    basement BOOLEAN DEFAULT FALSE,
-    attic BOOLEAN DEFAULT FALSE,
+    -- Additional data
+    utilities TEXT, -- JSON array
+    amenities TEXT, -- JSON array
     
-    -- Utilities and amenities
-    utilities JSON, -- JSON array: ["gaz", "apa", "canalizare", "electricitate", "internet", "cablu"]
-    amenities JSON, -- JSON array: ["lift", "interfon", "alarma", "clima", "mobilat", "utilat"]
-    
-    -- Energy efficiency
-    energy_class ENUM('A++', 'A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G'),
-    
-    -- Additional info
-    contact_name VARCHAR(100),
-    contact_phone VARCHAR(20),
-    contact_email VARCHAR(255),
-    
-    -- Status and moderation
-    status ENUM('draft', 'active', 'inactive', 'sold', 'rented', 'expired') DEFAULT 'draft',
-    featured BOOLEAN DEFAULT FALSE,
-    views_count INTEGER DEFAULT 0,
-    favorites_count INTEGER DEFAULT 0,
+    -- Property management
+    status TEXT CHECK(status IN ('draft', 'active', 'inactive', 'sold', 'rented', 'expired')) DEFAULT 'draft',
+    featured BOOLEAN DEFAULT 0,
+    priority INTEGER DEFAULT 0,
+    view_count INTEGER DEFAULT 0,
     
     -- SEO and metadata
-    slug VARCHAR(300) UNIQUE,
     meta_title VARCHAR(255),
-    meta_description TEXT,
+    meta_description VARCHAR(500),
+    meta_keywords VARCHAR(255),
     
     -- Timestamps
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     published_at DATETIME,
     expires_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     
-    -- Foreign key constraints
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    
-    -- Indexes for performance
-    INDEX idx_properties_user_id (user_id),
-    INDEX idx_properties_type (property_type),
-    INDEX idx_properties_transaction (transaction_type),
-    INDEX idx_properties_city (city),
-    INDEX idx_properties_status (status),
-    INDEX idx_properties_price (price),
-    INDEX idx_properties_location (latitude, longitude),
-    INDEX idx_properties_published (published_at),
-    INDEX idx_properties_slug (slug)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- ==========================================================================
@@ -137,22 +103,17 @@ CREATE TABLE IF NOT EXISTS property_images (
     property_id INTEGER NOT NULL,
     filename VARCHAR(255) NOT NULL,
     original_name VARCHAR(255),
-    mime_type VARCHAR(100),
+    alt_text VARCHAR(255),
+    caption VARCHAR(500),
+    is_primary BOOLEAN DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
     file_size INTEGER,
+    mime_type VARCHAR(50),
     width INTEGER,
     height INTEGER,
-    alt_text VARCHAR(255),
-    is_primary BOOLEAN DEFAULT FALSE,
-    sort_order INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
-    -- Foreign key constraints
-    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
-    
-    -- Indexes
-    INDEX idx_property_images_property_id (property_id),
-    INDEX idx_property_images_primary (is_primary),
-    INDEX idx_property_images_order (sort_order)
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE
 );
 
 -- ==========================================================================
@@ -163,18 +124,11 @@ CREATE TABLE IF NOT EXISTS favorites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     property_id INTEGER NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
-    -- Foreign key constraints
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
-    
-    -- Unique constraint to prevent duplicates
     UNIQUE(user_id, property_id),
-    
-    -- Indexes
-    INDEX idx_favorites_user_id (user_id),
-    INDEX idx_favorites_property_id (property_id)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE
 );
 
 -- ==========================================================================
@@ -184,21 +138,13 @@ CREATE TABLE IF NOT EXISTS favorites (
 CREATE TABLE IF NOT EXISTS property_views (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     property_id INTEGER NOT NULL,
-    user_id INTEGER, -- NULL for anonymous views
+    user_id INTEGER,
     ip_address VARCHAR(45),
     user_agent TEXT,
-    referer VARCHAR(500),
-    viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    viewed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
-    -- Foreign key constraints
     FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-    
-    -- Indexes
-    INDEX idx_property_views_property_id (property_id),
-    INDEX idx_property_views_user_id (user_id),
-    INDEX idx_property_views_date (viewed_at),
-    INDEX idx_property_views_ip (ip_address)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ==========================================================================
@@ -207,20 +153,15 @@ CREATE TABLE IF NOT EXISTS property_views (
 
 CREATE TABLE IF NOT EXISTS search_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER, -- NULL for anonymous searches
-    search_query VARCHAR(500),
-    filters JSON, -- JSON object with search filters
+    user_id INTEGER,
+    query_text VARCHAR(255),
+    filters TEXT, -- JSON
     results_count INTEGER,
     ip_address VARCHAR(45),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    user_agent TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
-    -- Foreign key constraints
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-    
-    -- Indexes
-    INDEX idx_search_history_user_id (user_id),
-    INDEX idx_search_history_date (created_at),
-    INDEX idx_search_history_query (search_query)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ==========================================================================
@@ -228,22 +169,17 @@ CREATE TABLE IF NOT EXISTS search_history (
 -- ==========================================================================
 
 CREATE TABLE IF NOT EXISTS user_sessions (
-    id VARCHAR(128) PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
+    session_id VARCHAR(255) UNIQUE NOT NULL,
     ip_address VARCHAR(45),
     user_agent TEXT,
     payload TEXT,
-    last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_activity DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
-    -- Foreign key constraints
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    
-    -- Indexes
-    INDEX idx_user_sessions_user_id (user_id),
-    INDEX idx_user_sessions_last_activity (last_activity),
-    INDEX idx_user_sessions_expires (expires_at)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- ==========================================================================
@@ -252,18 +188,13 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 
 CREATE TABLE IF NOT EXISTS rate_limits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    identifier VARCHAR(255) NOT NULL, -- IP address or user ID
+    identifier VARCHAR(255) NOT NULL,
     endpoint VARCHAR(255) NOT NULL,
-    requests_count INTEGER DEFAULT 1,
-    window_start DATETIME DEFAULT CURRENT_TIMESTAMP,
-    reset_at DATETIME NOT NULL,
+    attempts INTEGER DEFAULT 1,
+    reset_time DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
-    -- Unique constraint
-    UNIQUE(identifier, endpoint),
-    
-    -- Indexes
-    INDEX idx_rate_limits_identifier (identifier),
-    INDEX idx_rate_limits_reset (reset_at)
+    UNIQUE(identifier, endpoint)
 );
 
 -- ==========================================================================
@@ -274,21 +205,14 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
     action VARCHAR(100) NOT NULL,
-    resource_type VARCHAR(50),
-    resource_id INTEGER,
+    entity_type VARCHAR(50),
+    entity_id INTEGER,
     ip_address VARCHAR(45),
     user_agent TEXT,
-    details JSON,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    details TEXT, -- JSON
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
-    -- Foreign key constraints
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-    
-    -- Indexes
-    INDEX idx_activity_logs_user_id (user_id),
-    INDEX idx_activity_logs_action (action),
-    INDEX idx_activity_logs_date (created_at),
-    INDEX idx_activity_logs_resource (resource_type, resource_id)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ==========================================================================
@@ -299,14 +223,11 @@ CREATE TABLE IF NOT EXISTS site_config (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     config_key VARCHAR(100) UNIQUE NOT NULL,
     config_value TEXT,
-    config_type ENUM('string', 'integer', 'boolean', 'json') DEFAULT 'string',
-    description TEXT,
-    is_public BOOLEAN DEFAULT FALSE,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Indexes
-    INDEX idx_site_config_key (config_key),
-    INDEX idx_site_config_public (is_public)
+    config_type TEXT CHECK(config_type IN ('string', 'integer', 'boolean', 'json')) DEFAULT 'string',
+    is_public BOOLEAN DEFAULT 0,
+    description VARCHAR(255),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==========================================================================
@@ -314,33 +235,37 @@ CREATE TABLE IF NOT EXISTS site_config (
 -- ==========================================================================
 
 -- Default admin user (password: admin123 - CHANGE IN PRODUCTION!)
-INSERT OR IGNORE INTO users (
-    username, email, password_hash, first_name, last_name, 
-    role, status, email_verified
+INSERT OR REPLACE INTO users (
+    id, name, email, password, role, status, email_verified_at, created_at, updated_at
 ) VALUES (
-    'admin', 
-    'admin@rems.local', 
-    '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- bcrypt hash of 'admin123'
-    'Administrator', 
-    'System', 
-    'admin', 
-    'active', 
-    TRUE
+    1,
+    'Administrator',
+    'admin@rems.local',
+    '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- password: password
+    'admin',
+    'active',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
 );
 
 -- Default site configuration
-INSERT OR IGNORE INTO site_config (config_key, config_value, config_type, description, is_public) VALUES
-('site_name', 'REMS - Real Estate Management System', 'string', 'Site name', TRUE),
-('site_description', 'Modern real estate management platform', 'string', 'Site description', TRUE),
-('contact_email', 'contact@rems.local', 'string', 'Contact email', TRUE),
-('contact_phone', '+40123456789', 'string', 'Contact phone', TRUE),
-('max_upload_size', '10485760', 'integer', 'Maximum file upload size in bytes (10MB)', FALSE),
-('max_images_per_property', '20', 'integer', 'Maximum images per property', FALSE),
-('session_lifetime', '7200', 'integer', 'Session lifetime in seconds (2 hours)', FALSE),
-('rate_limit_requests', '100', 'integer', 'Rate limit requests per window', FALSE),
-('rate_limit_window', '3600', 'integer', 'Rate limit window in seconds (1 hour)', FALSE),
-('email_verification_required', 'true', 'boolean', 'Require email verification for new users', FALSE),
-('maintenance_mode', 'false', 'boolean', 'Enable maintenance mode', FALSE);
+INSERT OR REPLACE INTO site_config (config_key, config_value, config_type, is_public, description) VALUES
+('site_name', 'REMS - Real Estate Management System', 'string', 1, 'Site name'),
+('site_description', 'Professional real estate management platform', 'string', 1, 'Site description'),
+('contact_email', 'contact@rems.local', 'string', 1, 'Contact email'),
+('contact_phone', '+40 123 456 789', 'string', 1, 'Contact phone'),
+('properties_per_page', '20', 'integer', 1, 'Properties per page'),
+('max_image_size', '5242880', 'integer', 0, 'Maximum image size in bytes'),
+('allowed_image_types', '["jpg","jpeg","png","webp"]', 'json', 0, 'Allowed image types'),
+('enable_registration', '1', 'boolean', 1, 'Enable user registration'),
+('require_email_verification', '1', 'boolean', 0, 'Require email verification'),
+('default_currency', 'RON', 'string', 1, 'Default currency'),
+('google_maps_api_key', '', 'string', 0, 'Google Maps API key'),
+('smtp_host', '', 'string', 0, 'SMTP host'),
+('smtp_port', '587', 'integer', 0, 'SMTP port'),
+('smtp_username', '', 'string', 0, 'SMTP username'),
+('smtp_password', '', 'string', 0, 'SMTP password');
 
 -- ==========================================================================
 -- Database Functions and Triggers

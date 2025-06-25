@@ -1,9 +1,9 @@
 <?php
 /**
  * REMS - Real Estate Management System
- * Database Connection and Query Manager
+ * Database Class - Updated for SQLite
  * 
- * Handles database connections, queries, and transactions with security features
+ * Singleton database connection manager
  */
 
 declare(strict_types=1);
@@ -28,7 +28,7 @@ class Database
     public static function getInstance(): Database
     {
         if (self::$instance === null) {
-            self::$instance = new self();
+            self::$instance = new Database();
         }
         return self::$instance;
     }
@@ -38,88 +38,26 @@ class Database
      */
     private function connect(): void
     {
-        $connectionName = $this->config['default'];
-        $connectionConfig = $this->config['connections'][$connectionName];
-        
         try {
-            if ($connectionConfig['driver'] === 'sqlite') {
-                $this->connectSQLite($connectionConfig);
-            } elseif ($connectionConfig['driver'] === 'mysql') {
-                $this->connectMySQL($connectionConfig);
-            } else {
-                throw new InvalidArgumentException("Unsupported database driver: {$connectionConfig['driver']}");
-            }
+            $dsn = 'sqlite:' . $this->config['path'];
             
-            // Set additional PDO attributes
-            foreach ($connectionConfig['options'] as $option => $value) {
-                $this->connection->setAttribute($option, $value);
-            }
+            $this->connection = new PDO(
+                $dsn,
+                null,
+                null,
+                $this->config['options']
+            );
             
-            // Initialize database if using SQLite
-            if ($connectionConfig['driver'] === 'sqlite') {
-                $this->initializeSQLite();
-            }
+            // Set SQLite specific pragmas for performance
+            $this->connection->exec('PRAGMA journal_mode = WAL');
+            $this->connection->exec('PRAGMA synchronous = NORMAL');
+            $this->connection->exec('PRAGMA cache_size = 1000');
+            $this->connection->exec('PRAGMA temp_store = memory');
+            $this->connection->exec('PRAGMA foreign_keys = ON');
             
         } catch (PDOException $e) {
             error_log("Database connection failed: " . $e->getMessage());
-            throw new RuntimeException("Database connection failed: " . $e->getMessage(), 0, $e);
-        }
-    }
-    
-    /**
-     * Connect to SQLite database
-     */
-    private function connectSQLite(array $config): void
-    {
-        $dbPath = $config['database'];
-        $dbDir = dirname($dbPath);
-        
-        // Create database directory if it doesn't exist
-        if (!is_dir($dbDir)) {
-            mkdir($dbDir, 0755, true);
-        }
-        
-        $dsn = "sqlite:{$dbPath}";
-        $this->connection = new PDO($dsn, null, null, $config['options']);
-        
-        // Enable WAL mode for better concurrency
-        $this->connection->exec('PRAGMA journal_mode=WAL');
-        $this->connection->exec('PRAGMA synchronous=NORMAL');
-        $this->connection->exec('PRAGMA temp_store=MEMORY');
-        $this->connection->exec('PRAGMA mmap_size=268435456'); // 256MB
-    }
-    
-    /**
-     * Connect to MySQL database
-     */
-    private function connectMySQL(array $config): void
-    {
-        $dsn = "mysql:host={$config['host']};port={$config['port']};dbname={$config['database']};charset={$config['charset']}";
-        
-        $this->connection = new PDO(
-            $dsn,
-            $config['username'],
-            $config['password'],
-            $config['options']
-        );
-    }
-    
-    /**
-     * Initialize SQLite database with schema
-     */
-    private function initializeSQLite(): void
-    {
-        $schemaFile = __DIR__ . '/../../database/schema.sql';
-        
-        if (file_exists($schemaFile)) {
-            // Check if tables exist
-            $result = $this->query("SELECT name FROM sqlite_master WHERE type='table' AND name='users'");
-            
-            if (empty($result)) {
-                // Execute schema file
-                $schema = file_get_contents($schemaFile);
-                $this->connection->exec($schema);
-            }
+            throw new RuntimeException("Database connection failed: " . $e->getMessage());
         }
     }
     
@@ -147,8 +85,8 @@ class Database
             
             return $result;
         } catch (PDOException $e) {
-            $this->logError($sql, $params, $e->getMessage());
-            throw new RuntimeException("Query failed: " . $e->getMessage(), 0, $e);
+            error_log("Query failed: " . $e->getMessage() . " SQL: " . $sql);
+            throw new RuntimeException("Query failed: " . $e->getMessage());
         }
     }
     
@@ -186,8 +124,8 @@ class Database
             
             return $affectedRows;
         } catch (PDOException $e) {
-            $this->logError($sql, $params, $e->getMessage());
-            throw new RuntimeException("Execute failed: " . $e->getMessage(), 0, $e);
+            error_log("Execute failed: " . $e->getMessage() . " SQL: " . $sql);
+            throw new RuntimeException("Execute failed: " . $e->getMessage());
         }
     }
     
@@ -197,42 +135,81 @@ class Database
     public function insert(string $table, array $data): int
     {
         $columns = array_keys($data);
-        $placeholders = array_map(fn($col) => ":$col", $columns);
+        $placeholders = array_map(fn($col) => ':' . $col, $columns);
         
-        $sql = "INSERT INTO $table (" . implode(', ', $columns) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        $sql = sprintf(
+            "INSERT INTO %s (%s) VALUES (%s)",
+            $table,
+            implode(', ', $columns),
+            implode(', ', $placeholders)
+        );
         
-        $this->execute($sql, $data);
-        return (int) $this->connection->lastInsertId();
+        try {
+            $stmt = $this->connection->prepare($sql);
+            
+            // Bind parameters with proper types
+            foreach ($data as $key => $value) {
+                $stmt->bindValue(':' . $key, $value, $this->getPdoType($value));
+            }
+            
+            $stmt->execute();
+            return (int)$this->connection->lastInsertId();
+        } catch (PDOException $e) {
+            error_log("Insert failed: " . $e->getMessage() . " SQL: " . $sql);
+            throw new RuntimeException("Insert failed: " . $e->getMessage());
+        }
     }
     
     /**
      * Update records
      */
-    public function update(string $table, array $data, array $where): int
+    public function update(string $table, array $data, array $where): bool
     {
-        $setParts = array_map(fn($col) => "$col = :$col", array_keys($data));
-        $whereParts = array_map(fn($col) => "$col = :where_$col", array_keys($where));
+        $setClause = implode(', ', array_map(fn($col) => "$col = :$col", array_keys($data)));
+        $whereClause = implode(' AND ', array_map(fn($col) => "$col = :where_$col", array_keys($where)));
         
-        $sql = "UPDATE $table SET " . implode(', ', $setParts) . " WHERE " . implode(' AND ', $whereParts);
+        $sql = "UPDATE $table SET $setClause WHERE $whereClause";
         
-        // Merge data and where parameters
-        $params = $data;
-        foreach ($where as $key => $value) {
-            $params["where_$key"] = $value;
-        }
-        
-        return $this->execute($sql, $params);
+        try {
+            $stmt = $this->connection->prepare($sql);
+            
+            // Bind data parameters
+            foreach ($data as $key => $value) {
+                $stmt->bindValue(':' . $key, $value, $this->getPdoType($value));
+            }
+            
+            // Bind where parameters
+            foreach ($where as $key => $value) {
+                $stmt->bindValue(':where_' . $key, $value, $this->getPdoType($value));
+            }
+            
+                         return $stmt->execute();
+         } catch (PDOException $e) {
+             error_log("Update failed: " . $e->getMessage() . " SQL: " . $sql);
+             throw new RuntimeException("Update failed: " . $e->getMessage());
+         }
     }
     
     /**
      * Delete records
      */
-    public function delete(string $table, array $where): int
+    public function delete(string $table, array $where): bool
     {
-        $whereParts = array_map(fn($col) => "$col = :$col", array_keys($where));
-        $sql = "DELETE FROM $table WHERE " . implode(' AND ', $whereParts);
+        $whereClause = implode(' AND ', array_map(fn($col) => "$col = :$col", array_keys($where)));
+        $sql = "DELETE FROM $table WHERE $whereClause";
         
-        return $this->execute($sql, $where);
+        try {
+            $stmt = $this->connection->prepare($sql);
+            
+            foreach ($where as $key => $value) {
+                $stmt->bindValue(':' . $key, $value, $this->getPdoType($value));
+            }
+            
+                         return $stmt->execute();
+         } catch (PDOException $e) {
+             error_log("Delete failed: " . $e->getMessage() . " SQL: " . $sql);
+             throw new RuntimeException("Delete failed: " . $e->getMessage());
+         }
     }
     
     /**
@@ -450,5 +427,53 @@ class Database
     public function __wakeup()
     {
         throw new Exception("Cannot unserialize singleton");
+    }
+    
+    /**
+     * Get appropriate PDO parameter type
+     */
+    private function getPdoType($value): int
+    {
+        if (is_null($value)) {
+            return PDO::PARAM_NULL;
+        } elseif (is_bool($value)) {
+            return PDO::PARAM_BOOL;
+        } elseif (is_int($value)) {
+            return PDO::PARAM_INT;
+        } else {
+            return PDO::PARAM_STR;
+        }
+    }
+    
+    /**
+     * Check if database file exists and create if needed
+     */
+    public function ensureDatabaseExists(): void
+    {
+        $dbPath = $this->config['path'];
+        $dbDir = dirname($dbPath);
+        
+        if (!is_dir($dbDir)) {
+            mkdir($dbDir, 0755, true);
+        }
+        
+        if (!file_exists($dbPath)) {
+            // Create empty database file
+            touch($dbPath);
+            chmod($dbPath, 0644);
+        }
+    }
+    
+    /**
+     * Initialize database with schema if empty
+     */
+    public function initializeSchema(): void
+    {
+        $schemaFile = __DIR__ . '/../../database/schema.sql';
+        
+        if (file_exists($schemaFile)) {
+            $schema = file_get_contents($schemaFile);
+            $this->connection->exec($schema);
+        }
     }
 } 
