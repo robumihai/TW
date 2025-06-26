@@ -8,6 +8,11 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../utils/Auth.php';
+require_once __DIR__ . '/../utils/Response.php';
+require_once __DIR__ . '/../utils/Security.php';
+require_once __DIR__ . '/../models/Database.php';
+
 /**
  * Handle authentication endpoints
  */

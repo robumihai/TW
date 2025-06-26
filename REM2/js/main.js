@@ -2200,6 +2200,7 @@ window.App = {
             this.formHandler = new FormHandler();
             this.authModal = new AuthModal();
             this.statsCounter = new StatsCounter();
+            this.authManager = new AuthManager();
             
             // Initialize map (Stage 3 feature)
             this.mapManager = new MapManager();
@@ -2231,6 +2232,7 @@ window.App = {
             window.formHandler = this.formHandler;
             window.authModal = this.authModal;
             window.statsCounter = this.statsCounter;
+            window.authManager = this.authManager;
             window.mapManager = this.mapManager;
             window.propertyListing = this.propertyListing;
             
@@ -2248,4 +2250,449 @@ window.App = {
 
 document.addEventListener('DOMContentLoaded', async () => {
     await window.App.init();
-}); 
+});
+
+// ========================================================================
+// Authentication Management System
+// ========================================================================
+
+class AuthManager {
+    constructor() {
+        this.apiBaseUrl = '/api_auth.php';
+        this.currentUser = null;
+        this.isAuthenticated = false;
+        this.csrfToken = null;
+        
+        // Initialize authentication state
+        this.init();
+    }
+    
+    /**
+     * Initialize authentication manager
+     */
+    async init() {
+        try {
+            // Check if user is already authenticated
+            await this.checkAuthStatus();
+            
+            // Setup click outside handler for user menu
+            this.setupClickOutsideHandler();
+        } catch (error) {
+            console.warn('Auth check failed:', error);
+        }
+    }
+    
+    /**
+     * Setup click outside handler for user menu
+     */
+    setupClickOutsideHandler() {
+        document.addEventListener('click', (e) => {
+            const userDropdown = document.querySelector('.user-dropdown');
+            const userMenu = document.getElementById('user-menu');
+            const userToggle = document.querySelector('.user-toggle');
+            
+            if (userDropdown && userMenu && !userDropdown.contains(e.target)) {
+                userMenu.classList.remove('show');
+                if (userToggle) {
+                    userToggle.classList.remove('active');
+                }
+            }
+        });
+    }
+    
+    /**
+     * Check current authentication status
+     */
+    async checkAuthStatus() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}?endpoint=me`, {
+                credentials: 'include'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.data) {
+                this.currentUser = data.data;
+                this.isAuthenticated = true;
+                this.updateUI();
+            } else {
+                this.currentUser = null;
+                this.isAuthenticated = false;
+            }
+            
+        } catch (error) {
+            console.error('Auth status check failed:', error);
+            this.currentUser = null;
+            this.isAuthenticated = false;
+        }
+    }
+    
+    /**
+     * Login user
+     */
+    async login(credentials) {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}?endpoint=login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(credentials)
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.data.user) {
+                this.currentUser = data.data.user;
+                this.isAuthenticated = true;
+                this.csrfToken = data.data.csrf_token;
+                this.updateUI();
+                
+                // Redirect to dashboard or intended page
+                this.redirectAfterLogin();
+                
+                return { success: true, data: data.data };
+            } else {
+                return { success: false, message: data.message };
+            }
+            
+        } catch (error) {
+            console.error('Login failed:', error);
+            return { success: false, message: 'Eroare de conexiune' };
+        }
+    }
+    
+    /**
+     * Register new user
+     */
+    async register(userData) {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}?endpoint=register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(userData)
+            });
+            
+            const data = await response.json();
+            
+            return {
+                success: data.success,
+                message: data.message,
+                data: data.data || null
+            };
+            
+        } catch (error) {
+            console.error('Registration failed:', error);
+            return { success: false, message: 'Eroare de conexiune' };
+        }
+    }
+    
+    /**
+     * Logout user
+     */
+    async logout() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}?endpoint=logout`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.currentUser = null;
+                this.isAuthenticated = false;
+                this.csrfToken = null;
+                this.updateUI();
+                
+                // Redirect to login page
+                window.location.href = 'login.html';
+                
+                return { success: true };
+            }
+            
+        } catch (error) {
+            console.error('Logout failed:', error);
+        }
+        
+        // Force logout even if API call fails
+        this.currentUser = null;
+        this.isAuthenticated = false;
+        this.csrfToken = null;
+        this.updateUI();
+        window.location.href = 'login.html';
+    }
+    
+    /**
+     * Update UI based on authentication state
+     */
+    updateUI() {
+        const userNav = document.querySelector('.user-nav');
+        const loginBtn = document.querySelector('.login-btn');
+        const registerBtn = document.querySelector('.register-btn');
+        
+        if (this.isAuthenticated && this.currentUser) {
+            // Show user navigation
+            if (userNav) {
+                userNav.innerHTML = `
+                    <div class="user-dropdown">
+                        <button class="user-toggle" onclick="window.authManager.toggleUserMenu()">
+                            <span class="user-name">${this.currentUser.first_name} ${this.currentUser.last_name}</span>
+                            <span class="user-role">(${this.getUserRoleLabel()})</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="user-menu" id="user-menu">
+                            <a href="dashboard.html" class="user-menu-item">
+                                📊 Dashboard
+                            </a>
+                            <a href="profile.html" class="user-menu-item">
+                                👤 Profil
+                            </a>
+                            <a href="favorites.html" class="user-menu-item">
+                                ❤️ Favorite
+                            </a>
+                            ${this.currentUser.role === 'admin' ? '<a href="admin.html" class="user-menu-item">⚙️ Administrare</a>' : ''}
+                            ${this.canManageProperties() ? '<a href="manage-properties.html" class="user-menu-item">🏠 Proprietățile mele</a>' : ''}
+                            <hr class="user-menu-divider">
+                            <button onclick="window.authManager.logout()" class="user-menu-item logout-btn">
+                                🚪 Deconectare
+                            </button>
+                        </div>
+                    </div>
+                `;
+                userNav.style.display = 'block';
+            }
+            
+            // Hide login/register buttons
+            if (loginBtn) loginBtn.style.display = 'none';
+            if (registerBtn) registerBtn.style.display = 'none';
+            
+        } else {
+            // Show login/register buttons
+            if (loginBtn) loginBtn.style.display = 'inline-block';
+            if (registerBtn) registerBtn.style.display = 'inline-block';
+            
+            // Hide user navigation
+            if (userNav) {
+                userNav.style.display = 'none';
+            }
+        }
+        
+        console.log('Auth state updated:', this.isAuthenticated ? 'Authenticated' : 'Not authenticated');
+    }
+    
+    /**
+     * Get user role label in Romanian
+     */
+    getUserRoleLabel() {
+        const roleLabels = {
+            'admin': 'Administrator',
+            'agent': 'Agent',
+            'user': 'Client'
+        };
+        
+        return roleLabels[this.currentUser?.role] || 'Utilizator';
+    }
+    
+    /**
+     * Check if user can manage properties
+     */
+    canManageProperties() {
+        return this.isAuthenticated && 
+               this.currentUser && 
+               ['admin', 'agent'].includes(this.currentUser.role);
+    }
+    
+    /**
+     * Toggle user menu
+     */
+    toggleUserMenu() {
+        const userMenu = document.getElementById('user-menu');
+        const userToggle = document.querySelector('.user-toggle');
+        
+        if (userMenu) {
+            userMenu.classList.toggle('show');
+            if (userToggle) {
+                userToggle.classList.toggle('active');
+            }
+        }
+    }
+    
+    /**
+     * Redirect after successful login
+     */
+    redirectAfterLogin() {
+        // Check if there's a stored redirect URL
+        const redirectUrl = sessionStorage.getItem('redirect_after_login');
+        
+        if (redirectUrl) {
+            sessionStorage.removeItem('redirect_after_login');
+            window.location.href = redirectUrl;
+        } else {
+            // Default redirect based on user role
+            if (this.currentUser.role === 'admin') {
+                window.location.href = 'admin.html';
+            } else if (this.currentUser.role === 'agent') {
+                window.location.href = 'dashboard.html';
+            } else {
+                window.location.href = 'index.html';
+            }
+        }
+    }
+    
+    /**
+     * Initialize login page
+     */
+    initLoginPage() {
+        const loginForm = document.getElementById('login-form');
+        const loginBtn = document.getElementById('login-btn');
+        
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                // Clear previous messages
+                this.hideMessages();
+                
+                // Show loading state
+                loginBtn.classList.add('loading');
+                
+                // Get form data
+                const formData = new FormData(loginForm);
+                const credentials = {
+                    login: formData.get('login'),
+                    password: formData.get('password'),
+                    remember_me: formData.get('remember_me') === 'on'
+                };
+                
+                // Validate required fields
+                if (!credentials.login || !credentials.password) {
+                    this.showError('Vă rugăm să completați toate câmpurile obligatorii.');
+                    loginBtn.classList.remove('loading');
+                    return;
+                }
+                
+                // Attempt login
+                const result = await this.login(credentials);
+                
+                if (result.success) {
+                    this.showSuccess('Autentificare reușită! Vă redirecționăm...');
+                    // Redirect is handled in login method
+                } else {
+                    this.showError(result.message || 'Eroare la autentificare');
+                    loginBtn.classList.remove('loading');
+                }
+            });
+        }
+    }
+    
+    /**
+     * Initialize register page
+     */
+    initRegisterPage() {
+        const registerForm = document.getElementById('register-form');
+        const registerBtn = document.getElementById('register-btn');
+        
+        if (registerForm) {
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                // Clear previous messages
+                this.hideMessages();
+                
+                // Show loading state
+                registerBtn.classList.add('loading');
+                
+                // Get form data
+                const formData = new FormData(registerForm);
+                const userData = {
+                    username: formData.get('username'),
+                    email: formData.get('email'),
+                    password: formData.get('password'),
+                    first_name: formData.get('first_name'),
+                    last_name: formData.get('last_name'),
+                    phone: formData.get('phone'),
+                    terms: formData.get('terms') === 'on'
+                };
+                
+                // Validate required fields
+                const requiredFields = ['username', 'email', 'password', 'first_name', 'last_name'];
+                const missingFields = requiredFields.filter(field => !userData[field]);
+                
+                if (missingFields.length > 0) {
+                    this.showError('Vă rugăm să completați toate câmpurile obligatorii.');
+                    registerBtn.classList.remove('loading');
+                    return;
+                }
+                
+                // Validate password confirmation
+                const passwordConfirm = formData.get('password_confirm');
+                if (userData.password !== passwordConfirm) {
+                    this.showError('Parolele nu se potrivesc.');
+                    registerBtn.classList.remove('loading');
+                    return;
+                }
+                
+                // Validate terms acceptance
+                if (!userData.terms) {
+                    this.showError('Trebuie să acceptați termenii și condițiile.');
+                    registerBtn.classList.remove('loading');
+                    return;
+                }
+                
+                // Attempt registration
+                const result = await this.register(userData);
+                
+                if (result.success) {
+                    this.showSuccess('Cont creat cu succes! Vă puteți autentifica acum.');
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 2000);
+                } else {
+                    this.showError(result.message || 'Eroare la înregistrare');
+                    registerBtn.classList.remove('loading');
+                }
+            });
+        }
+    }
+    
+    /**
+     * Show error message
+     */
+    showError(message) {
+        const errorDiv = document.getElementById('auth-error');
+        if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+    }
+    
+    /**
+     * Show success message
+     */
+    showSuccess(message) {
+        const successDiv = document.getElementById('auth-success');
+        if (successDiv) {
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+        }
+    }
+    
+    /**
+     * Hide all messages
+     */
+    hideMessages() {
+        const errorDiv = document.getElementById('auth-error');
+        const successDiv = document.getElementById('auth-success');
+        
+        if (errorDiv) errorDiv.style.display = 'none';
+        if (successDiv) successDiv.style.display = 'none';
+    }
+}
+
+// Make AuthManager globally available
+window.AuthManager = AuthManager; 

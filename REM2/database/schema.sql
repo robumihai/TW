@@ -15,14 +15,22 @@ PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(100) NOT NULL,
+    username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
     phone VARCHAR(20),
     role TEXT CHECK(role IN ('admin', 'agent', 'user')) DEFAULT 'user',
     status TEXT CHECK(status IN ('active', 'inactive', 'pending', 'suspended')) DEFAULT 'pending',
     avatar VARCHAR(255),
-    email_verified_at DATETIME,
+    email_verified BOOLEAN DEFAULT 0,
+    email_verification_token VARCHAR(255),
+    password_reset_token VARCHAR(255),
+    password_reset_expires DATETIME,
+    last_login DATETIME,
+    login_attempts INTEGER DEFAULT 0,
+    locked_until DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -79,6 +87,7 @@ CREATE TABLE IF NOT EXISTS properties (
     featured BOOLEAN DEFAULT 0,
     priority INTEGER DEFAULT 0,
     view_count INTEGER DEFAULT 0,
+    favorites_count INTEGER DEFAULT 0,
     
     -- SEO and metadata
     meta_title VARCHAR(255),
@@ -234,17 +243,19 @@ CREATE TABLE IF NOT EXISTS site_config (
 -- Insert Default Data
 -- ==========================================================================
 
--- Default admin user (password: admin123 - CHANGE IN PRODUCTION!)
+-- Default admin user (password: password123 - CHANGE IN PRODUCTION!)
 INSERT OR REPLACE INTO users (
-    id, name, email, password, role, status, email_verified_at, created_at, updated_at
+    id, username, email, password_hash, first_name, last_name, role, status, email_verified, created_at, updated_at
 ) VALUES (
     1,
-    'Administrator',
+    'admin',
     'admin@rems.local',
-    '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- password: password
+    '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- password: password123
+    'Admin',
+    'User',
     'admin',
     'active',
-    CURRENT_TIMESTAMP,
+    1,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 );

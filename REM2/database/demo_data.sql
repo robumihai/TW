@@ -12,13 +12,14 @@ DELETE FROM search_history;
 DELETE FROM properties;
 DELETE FROM users WHERE id != 1; -- Keep admin user
 
--- Insert demo users
-INSERT INTO users (id, name, email, password, phone, role, status, created_at, updated_at) VALUES
-(2, 'Maria Popescu', 'maria@example.com', '$2y$10$example_hash_here', '+40721234567', 'agent', 'active', datetime('now', '-30 days'), datetime('now', '-1 day')),
-(3, 'Ion Marinescu', 'ion@example.com', '$2y$10$example_hash_here', '+40722345678', 'agent', 'active', datetime('now', '-25 days'), datetime('now', '-2 days')),
-(4, 'Ana Constantinescu', 'ana@example.com', '$2y$10$example_hash_here', '+40723456789', 'agent', 'active', datetime('now', '-20 days'), datetime('now', '-3 days')),
-(5, 'Mihai Stoica', 'mihai@example.com', '$2y$10$example_hash_here', '+40724567890', 'user', 'active', datetime('now', '-15 days'), datetime('now', '-1 day')),
-(6, 'Elena Vasilescu', 'elena@example.com', '$2y$10$example_hash_here', '+40725678901', 'user', 'active', datetime('now', '-10 days'), datetime('now', '-2 days'));
+-- Insert demo users (password for all is "password123")
+INSERT INTO users (id, username, email, password_hash, first_name, last_name, phone, role, status, email_verified, last_login, created_at, updated_at) VALUES
+(2, 'maria.popescu', 'maria@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Maria', 'Popescu', '+40721234567', 'agent', 'active', 1, datetime('now', '-1 day'), datetime('now', '-30 days'), datetime('now', '-1 day')),
+(3, 'ion.marinescu', 'ion@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Ion', 'Marinescu', '+40722345678', 'agent', 'active', 1, datetime('now', '-2 days'), datetime('now', '-25 days'), datetime('now', '-2 days')),
+(4, 'ana.constantinescu', 'ana@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Ana', 'Constantinescu', '+40723456789', 'agent', 'active', 1, datetime('now', '-3 days'), datetime('now', '-20 days'), datetime('now', '-3 days')),
+(5, 'mihai.stoica', 'mihai@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Mihai', 'Stoica', '+40724567890', 'user', 'active', 1, datetime('now', '-1 day'), datetime('now', '-15 days'), datetime('now', '-1 day')),
+(6, 'elena.vasilescu', 'elena@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Elena', 'Vasilescu', '+40725678901', 'user', 'active', 1, datetime('now', '-2 days'), datetime('now', '-10 days'), datetime('now', '-2 days')),
+(7, 'admin', 'admin@rems.ro', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Admin', 'User', '+40741234567', 'admin', 'active', 1, datetime('now'), datetime('now', '-60 days'), datetime('now'));
 
 -- Insert demo properties
 INSERT INTO properties (
