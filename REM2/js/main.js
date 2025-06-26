@@ -10,6 +10,8 @@
  * - Property display on map
  * - Interactive filtering and search
  * - Geolocation support
+ * - Property listing and filtering
+ * - Pagination and view management
  */
 
 // ======================================
@@ -1250,6 +1252,908 @@ class StatsCounter {
 }
 
 // ======================================
+// Property Listing Manager
+// ======================================
+
+class PropertyListing {
+    constructor() {
+        this.apiHandler = null;
+        this.loadingManager = null;
+        this.messageSystem = null;
+        this.currentPage = 1;
+        this.itemsPerPage = 12;
+        this.currentFilters = {};
+        this.currentSort = 'newest';
+        this.currentView = 'grid';
+        this.totalResults = 0;
+        this.isLoading = false;
+        this.searchTimeout = null;
+        
+        // Elements
+        this.elements = {
+            form: null,
+            grid: null,
+            pagination: null,
+            resultsCount: null,
+            resultsTitle: null,
+            sortSelect: null,
+            viewButtons: null,
+            quickFilters: null,
+            backToTop: null,
+            loadingContainer: null,
+            errorContainer: null,
+            emptyContainer: null,
+            advancedFilters: null,
+            advancedToggle: null,
+            showAdvanced: null,
+            totalProperties: null
+        };
+        
+        this.cities = [];
+    }
+
+    async init() {
+        // Get references to shared instances
+        this.apiHandler = window.App?.apiHandler || new APIHandler();
+        this.loadingManager = window.App?.loadingManager || new LoadingManager();
+        this.messageSystem = window.App?.messageSystem || new MessageSystem();
+        
+        this.initializeElements();
+        this.setupEventListeners();
+        await this.loadCities();
+        await this.loadInitialData();
+        this.setupURLHandling();
+        this.setupBackToTop();
+        
+        console.log('PropertyListing initialized');
+    }
+
+    initializeElements() {
+        this.elements.form = document.getElementById('property-search-form');
+        this.elements.grid = document.getElementById('properties-grid');
+        this.elements.pagination = document.querySelector('.pagination');
+        this.elements.resultsCount = document.getElementById('results-count');
+        this.elements.resultsTitle = document.querySelector('.results-title');
+        this.elements.sortSelect = document.getElementById('sort-select');
+        this.elements.viewButtons = document.querySelectorAll('.view-btn');
+        this.elements.quickFilters = document.querySelectorAll('.quick-filter-btn');
+        this.elements.backToTop = document.getElementById('back-to-top');
+        this.elements.loadingContainer = document.getElementById('loading-container');
+        this.elements.errorContainer = document.getElementById('error-container');
+        this.elements.emptyContainer = document.getElementById('empty-container');
+        this.elements.advancedFilters = document.getElementById('advanced-filters');
+        this.elements.advancedToggle = document.getElementById('toggle-advanced');
+        this.elements.showAdvanced = document.getElementById('show-advanced');
+        this.elements.totalProperties = document.getElementById('total-properties');
+    }
+
+    setupEventListeners() {
+        // Search form
+        if (this.elements.form) {
+            this.elements.form.addEventListener('submit', (e) => this.handleSearch(e));
+            
+            // Real-time search for text input
+            const searchInput = this.elements.form.querySelector('[name="search"]');
+            if (searchInput) {
+                searchInput.addEventListener('input', Utils.debounce((e) => {
+                    this.handleInstantSearch();
+                }, CONFIG.DEBOUNCE_DELAY));
+            }
+            
+            // Filter changes
+            const filterInputs = this.elements.form.querySelectorAll('select, input[type="number"]');
+            filterInputs.forEach(input => {
+                input.addEventListener('change', () => this.handleFilterChange());
+            });
+        }
+
+        // Sort selection
+        if (this.elements.sortSelect) {
+            this.elements.sortSelect.addEventListener('change', (e) => {
+                this.currentSort = e.target.value;
+                this.currentPage = 1;
+                this.loadProperties();
+            });
+        }
+
+        // View toggle
+        this.elements.viewButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleViewToggle(e));
+        });
+
+        // Quick filters
+        this.elements.quickFilters.forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleQuickFilter(e));
+        });
+
+        // Advanced filters toggle
+        if (this.elements.advancedToggle) {
+            this.elements.advancedToggle.addEventListener('click', () => this.toggleAdvancedFilters());
+        }
+        
+        if (this.elements.showAdvanced) {
+            this.elements.showAdvanced.addEventListener('click', () => this.showAdvancedFilters());
+        }
+
+        // Clear filters
+        const clearFiltersBtn = document.getElementById('clear-filters');
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', () => this.clearFilters());
+        }
+        
+        const clearSearchBtn = document.getElementById('clear-search');
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', () => this.clearFilters());
+        }
+
+        // Retry button
+        const retryBtn = document.getElementById('retry-button');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => this.loadProperties());
+        }
+
+        // Back to top
+        if (this.elements.backToTop) {
+            this.elements.backToTop.addEventListener('click', () => this.scrollToTop());
+        }
+
+        // Pagination delegation
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.pagination-item:not(.active):not(:disabled)')) {
+                e.preventDefault();
+                const page = parseInt(e.target.dataset.page);
+                if (page && page !== this.currentPage) {
+                    this.goToPage(page);
+                }
+            }
+        });
+
+        // Property card delegation
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.property-card, .property-card *:not(.property-card-favorite)')) {
+                const card = e.target.closest('.property-card');
+                if (card && !e.target.closest('.property-card-favorite')) {
+                    this.handlePropertyClick(card);
+                }
+            }
+            
+            if (e.target.matches('.property-card-favorite')) {
+                e.stopPropagation();
+                this.handleFavoriteClick(e.target);
+            }
+        });
+    }
+
+    async loadCities() {
+        try {
+            const response = await fetch('/api_properties.php?endpoint=cities');
+            const data = await response.json();
+            this.cities = data.data || [];
+            this.populateCitiesDropdown();
+        } catch (error) {
+            console.warn('Could not load cities:', error);
+            this.cities = ['București', 'Cluj-Napoca', 'Constanța', 'Iași', 'Timișoara', 'Craiova', 'Brașov', 'Galați', 'Ploiești', 'Oradea'];
+            this.populateCitiesDropdown();
+        }
+    }
+
+    populateCitiesDropdown() {
+        const citySelect = document.getElementById('city');
+        if (!citySelect || !this.cities.length) return;
+
+        // Clear existing options except the first one
+        const firstOption = citySelect.querySelector('option[value=""]');
+        citySelect.innerHTML = '';
+        if (firstOption) {
+            citySelect.appendChild(firstOption);
+        }
+
+        this.cities.forEach(city => {
+            const option = document.createElement('option');
+            option.value = city;
+            option.textContent = city;
+            citySelect.appendChild(option);
+        });
+    }
+
+    async loadInitialData() {
+        this.parseURLParams();
+        await this.loadProperties();
+        await this.loadStatistics();
+    }
+
+    parseURLParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Parse filters from URL
+        const filters = {};
+        for (const [key, value] of urlParams.entries()) {
+            if (value) {
+                filters[key] = value;
+            }
+        }
+        
+        // Parse pagination
+        this.currentPage = parseInt(urlParams.get('page')) || 1;
+        this.currentSort = urlParams.get('sort') || 'newest';
+        this.currentView = urlParams.get('view') || 'grid';
+        
+        // Set form values
+        this.setFormValues(filters);
+        this.currentFilters = filters;
+        
+        // Update UI
+        if (this.elements.sortSelect) {
+            this.elements.sortSelect.value = this.currentSort;
+        }
+        
+        this.updateViewButtons();
+    }
+
+    setFormValues(filters) {
+        if (!this.elements.form) return;
+
+        Object.keys(filters).forEach(key => {
+            const element = this.elements.form.querySelector(`[name="${key}"]`);
+            if (element) {
+                element.value = filters[key];
+            }
+        });
+    }
+
+    updateURL() {
+        const params = new URLSearchParams();
+        
+        // Add filters
+        Object.keys(this.currentFilters).forEach(key => {
+            if (this.currentFilters[key]) {
+                params.set(key, this.currentFilters[key]);
+            }
+        });
+        
+        // Add pagination and sort
+        if (this.currentPage > 1) {
+            params.set('page', this.currentPage.toString());
+        }
+        
+        if (this.currentSort !== 'newest') {
+            params.set('sort', this.currentSort);
+        }
+        
+        if (this.currentView !== 'grid') {
+            params.set('view', this.currentView);
+        }
+        
+        // Update URL without reload
+        const newURL = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+        window.history.replaceState({}, '', newURL);
+    }
+
+    setupURLHandling() {
+        window.addEventListener('popstate', () => {
+            this.parseURLParams();
+            this.loadProperties();
+        });
+    }
+
+    async handleSearch(e) {
+        e.preventDefault();
+        this.currentPage = 1;
+        this.collectFilters();
+        await this.loadProperties();
+    }
+
+    async handleInstantSearch() {
+        clearTimeout(this.searchTimeout);
+        this.searchTimeout = setTimeout(async () => {
+            this.currentPage = 1;
+            this.collectFilters();
+            await this.loadProperties();
+        }, CONFIG.DEBOUNCE_DELAY);
+    }
+
+    async handleFilterChange() {
+        this.currentPage = 1;
+        this.collectFilters();
+        await this.loadProperties();
+    }
+
+    collectFilters() {
+        if (!this.elements.form) return;
+
+        const formData = new FormData(this.elements.form);
+        const filters = {};
+
+        for (const [key, value] of formData.entries()) {
+            if (value && value.trim()) {
+                filters[key] = value.trim();
+            }
+        }
+
+        this.currentFilters = filters;
+    }
+
+    handleViewToggle(e) {
+        const button = e.target.closest('.view-btn');
+        if (!button) return;
+
+        this.currentView = button.dataset.view;
+        this.updateViewButtons();
+        this.updateGridView();
+        this.updateURL();
+    }
+
+    updateViewButtons() {
+        this.elements.viewButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.view === this.currentView);
+        });
+    }
+
+    updateGridView() {
+        if (!this.elements.grid) return;
+
+        this.elements.grid.className = `properties-grid view-${this.currentView}`;
+    }
+
+    handleQuickFilter(e) {
+        const button = e.target.closest('.quick-filter-btn');
+        if (!button) return;
+
+        const filter = button.dataset.filter;
+        if (!filter) return;
+
+        const [key, value] = filter.split('=');
+        
+        // Toggle quick filter
+        if (this.currentFilters[key] === value) {
+            delete this.currentFilters[key];
+            button.classList.remove('active');
+        } else {
+            this.currentFilters[key] = value;
+            button.classList.add('active');
+            
+            // Remove active class from other buttons of same type
+            this.elements.quickFilters.forEach(btn => {
+                if (btn !== button && btn.dataset.filter.startsWith(key + '=')) {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        // Update form
+        this.setFormValues(this.currentFilters);
+        
+        this.currentPage = 1;
+        this.loadProperties();
+    }
+
+    clearFilters() {
+        this.currentFilters = {};
+        this.currentPage = 1;
+        
+        // Clear form
+        if (this.elements.form) {
+            this.elements.form.reset();
+        }
+        
+        // Clear quick filters
+        this.elements.quickFilters.forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        this.loadProperties();
+    }
+
+    toggleAdvancedFilters() {
+        if (!this.elements.advancedFilters || !this.elements.advancedToggle) return;
+        
+        const isHidden = this.elements.advancedFilters.classList.contains('hidden');
+        
+        if (isHidden) {
+            this.showAdvancedFilters();
+        } else {
+            this.hideAdvancedFilters();
+        }
+    }
+
+    showAdvancedFilters() {
+        if (!this.elements.advancedFilters) return;
+        
+        this.elements.advancedFilters.classList.remove('hidden');
+        
+        if (this.elements.advancedToggle) {
+            this.elements.advancedToggle.style.display = 'block';
+            const toggleText = this.elements.advancedToggle.querySelector('.toggle-text');
+            const toggleIcon = this.elements.advancedToggle.querySelector('.toggle-icon');
+            if (toggleText) toggleText.textContent = 'Ascunde filtrele avansate';
+            if (toggleIcon) toggleIcon.textContent = '▲';
+        }
+        
+        if (this.elements.showAdvanced) {
+            this.elements.showAdvanced.parentElement.classList.add('hidden');
+        }
+    }
+
+    hideAdvancedFilters() {
+        if (!this.elements.advancedFilters) return;
+        
+        this.elements.advancedFilters.classList.add('hidden');
+        
+        if (this.elements.showAdvanced) {
+            this.elements.showAdvanced.parentElement.classList.remove('hidden');
+        }
+    }
+
+    async goToPage(page) {
+        if (page === this.currentPage || this.isLoading) return;
+        
+        this.currentPage = page;
+        await this.loadProperties();
+        
+        // Scroll to results
+        const resultsSection = document.querySelector('.results-section');
+        if (resultsSection) {
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+    async loadProperties() {
+        if (this.isLoading) return;
+        
+        this.isLoading = true;
+        this.showLoading();
+        
+        try {
+            const params = {
+                ...this.currentFilters,
+                page: this.currentPage,
+                limit: this.itemsPerPage,
+                sort: this.currentSort,
+                endpoint: 'search'
+            };
+            
+            // Use simplified API endpoint
+            const url = '/api_properties.php';
+            const queryString = new URLSearchParams(params).toString();
+            const response = await fetch(`${url}?${queryString}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.message || 'Failed to load properties');
+            }
+            
+            this.totalResults = data.pagination?.total || 0;
+            this.displayProperties(data.data || []);
+            this.updatePagination(data.pagination);
+            this.updateResultsInfo();
+            this.updateURL();
+            this.hideError();
+            this.hideEmpty();
+            
+        } catch (error) {
+            console.error('Error loading properties:', error);
+            this.showError(error.message);
+            this.displayProperties([]);
+        } finally {
+            this.isLoading = false;
+            this.hideLoading();
+        }
+    }
+
+    displayProperties(properties) {
+        if (!this.elements.grid) return;
+        
+        if (!properties.length) {
+            this.showEmpty();
+            this.elements.grid.innerHTML = '';
+            return;
+        }
+        
+        this.hideEmpty();
+        
+        const html = properties.map(property => this.createPropertyCard(property)).join('');
+        this.elements.grid.innerHTML = html;
+        
+        // Update quick filters state
+        this.updateQuickFiltersState();
+        
+        // Animate cards
+        this.animateCards();
+    }
+
+    createPropertyCard(property) {
+        const price = Utils.formatPrice(property.price, property.currency || '€');
+        const pricePerSqm = property.price && property.surface_useful ? 
+            ` (${Utils.formatPrice(Math.round(property.price / property.surface_useful))}/${property.surface_useful > 0 ? 'm²' : 'mp'})` : '';
+        
+        const imageUrl = property.primary_image ? 
+            `/assets/images/properties/${property.primary_image}` : 
+            '/assets/images/placeholder-property.jpg';
+        
+        const typeLabels = {
+            'apartament': 'Apartament',
+            'casa': 'Casă',
+            'teren': 'Teren',
+            'comercial': 'Comercial',
+            'birou': 'Birou',
+            'garsoniera': 'Garsonieră'
+        };
+        
+        const transactionLabels = {
+            'vanzare': 'Vânzare',
+            'inchiriere': 'Închiriere'
+        };
+        
+        const typeLabel = typeLabels[property.property_type] || property.property_type;
+        const transactionLabel = transactionLabels[property.transaction_type] || property.transaction_type;
+        
+        return `
+            <div class="property-card" data-property-id="${property.id}">
+                <div class="property-card-image">
+                    <img src="${imageUrl}" alt="${Utils.escapeHtml(property.title)}" loading="lazy">
+                    <div class="property-card-badges">
+                        <span class="badge badge-primary">${transactionLabel}</span>
+                        ${property.featured ? '<span class="badge badge-warning">Recomandat</span>' : ''}
+                    </div>
+                    <button class="property-card-favorite" data-property-id="${property.id}" aria-label="Adaugă la favorite">
+                        ♡
+                    </button>
+                </div>
+                
+                <div class="property-card-content">
+                    <div class="property-card-header">
+                        <div class="property-card-price">
+                            ${price}
+                            ${property.transaction_type === 'inchiriere' ? '<span class="property-card-price-period">/lună</span>' : ''}
+                        </div>
+                        <div class="property-card-type">${typeLabel}</div>
+                    </div>
+                    
+                    <h3 class="property-card-title">${Utils.escapeHtml(property.title)}</h3>
+                    <p class="property-card-location">${Utils.escapeHtml(property.address || '')}, ${Utils.escapeHtml(property.city || '')}</p>
+                    
+                    <div class="property-card-details">
+                        ${property.surface_useful ? `
+                            <div class="property-card-detail">
+                                <span class="property-card-detail-value">${property.surface_useful}</span>
+                                <span class="property-card-detail-label">mp</span>
+                            </div>
+                        ` : ''}
+                        ${property.rooms ? `
+                            <div class="property-card-detail">
+                                <span class="property-card-detail-value">${property.rooms}</span>
+                                <span class="property-card-detail-label">camere</span>
+                            </div>
+                        ` : ''}
+                        ${property.bathrooms ? `
+                            <div class="property-card-detail">
+                                <span class="property-card-detail-value">${property.bathrooms}</span>
+                                <span class="property-card-detail-label">băi</span>
+                            </div>
+                        ` : ''}
+                        ${property.floor ? `
+                            <div class="property-card-detail">
+                                <span class="property-card-detail-value">${property.floor}</span>
+                                <span class="property-card-detail-label">etaj</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="property-card-footer">
+                        <span class="property-card-agent">${Utils.escapeHtml(property.agent_name || 'Agent')}</span>
+                        <span class="property-card-date">${this.formatDate(property.created_at)}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    formatDate(dateString) {
+        if (!dateString) return '';
+        
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffTime = Math.abs(now - date);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 1) return 'Ieri';
+        if (diffDays < 7) return `${diffDays} zile`;
+        if (diffDays < 30) return `${Math.floor(diffDays / 7)} săptămâni`;
+        
+        return new Intl.DateTimeFormat('ro-RO', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        }).format(date);
+    }
+
+    updatePagination(pagination) {
+        if (!this.elements.pagination || !pagination) return;
+        
+        const { current_page, total_pages, has_prev, has_next } = pagination;
+        
+        if (total_pages <= 1) {
+            this.elements.pagination.parentElement.style.display = 'none';
+            return;
+        }
+        
+        this.elements.pagination.parentElement.style.display = 'flex';
+        
+        let html = '';
+        
+        // Previous button
+        html += `
+            <button class="pagination-item pagination-prev" 
+                    data-page="${current_page - 1}" 
+                    ${!has_prev ? 'disabled' : ''}>
+                ←
+            </button>
+        `;
+        
+        // Page numbers
+        const startPage = Math.max(1, current_page - 2);
+        const endPage = Math.min(total_pages, current_page + 2);
+        
+        if (startPage > 1) {
+            html += `<button class="pagination-item" data-page="1">1</button>`;
+            if (startPage > 2) {
+                html += `<span class="pagination-item" disabled>...</span>`;
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            html += `
+                <button class="pagination-item ${i === current_page ? 'active' : ''}" 
+                        data-page="${i}" 
+                        ${i === current_page ? 'disabled' : ''}>
+                    ${i}
+                </button>
+            `;
+        }
+        
+        if (endPage < total_pages) {
+            if (endPage < total_pages - 1) {
+                html += `<span class="pagination-item" disabled>...</span>`;
+            }
+            html += `<button class="pagination-item" data-page="${total_pages}">${total_pages}</button>`;
+        }
+        
+        // Next button
+        html += `
+            <button class="pagination-item pagination-next" 
+                    data-page="${current_page + 1}" 
+                    ${!has_next ? 'disabled' : ''}>
+                →
+            </button>
+        `;
+        
+        this.elements.pagination.innerHTML = html;
+    }
+
+    updateResultsInfo() {
+        if (this.elements.resultsCount) {
+            this.elements.resultsCount.textContent = this.totalResults.toLocaleString('ro-RO');
+        }
+        
+        if (this.elements.resultsTitle) {
+            const text = this.totalResults === 1 ? 'proprietate găsită' : 'proprietăți găsite';
+            this.elements.resultsTitle.innerHTML = `<span id="results-count">${this.totalResults.toLocaleString('ro-RO')}</span> ${text}`;
+        }
+    }
+
+    updateQuickFiltersState() {
+        this.elements.quickFilters.forEach(btn => {
+            const filter = btn.dataset.filter;
+            if (!filter) return;
+            
+            const [key, value] = filter.split('=');
+            btn.classList.toggle('active', this.currentFilters[key] === value);
+        });
+    }
+
+    animateCards() {
+        if (!this.elements.grid) return;
+        
+        const cards = this.elements.grid.querySelectorAll('.property-card');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 50);
+        });
+    }
+
+    async loadStatistics() {
+        try {
+            const response = await fetch('/api_properties.php?endpoint=statistics');
+            const data = await response.json();
+            if (data && this.elements.totalProperties) {
+                this.elements.totalProperties.textContent = (data.total_properties || 0).toLocaleString('ro-RO');
+            }
+        } catch (error) {
+            console.warn('Could not load statistics:', error);
+        }
+    }
+
+    handlePropertyClick(card) {
+        const propertyId = card.dataset.propertyId;
+        if (!propertyId) return;
+        
+        // For now, show a modal. Later this will navigate to property detail page
+        this.showPropertyModal(propertyId);
+    }
+
+    async showPropertyModal(propertyId) {
+        try {
+            const response = await this.apiHandler.get(`/properties/${propertyId}`);
+            if (response.success) {
+                this.displayPropertyModal(response.data);
+            }
+        } catch (error) {
+            this.messageSystem.error('Nu am putut încărca detaliile proprietății');
+        }
+    }
+
+    displayPropertyModal(property) {
+        const modal = document.getElementById('property-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        
+        if (!modal || !modalTitle || !modalBody) return;
+        
+        modalTitle.textContent = property.title;
+        modalBody.innerHTML = this.createPropertyModalContent(property);
+        
+        modal.classList.add('active');
+        modal.setAttribute('aria-hidden', 'false');
+        
+        // Setup modal close
+        const closeModal = () => {
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        };
+        
+        modal.querySelector('.modal-close').onclick = closeModal;
+        modal.querySelector('.modal-overlay').onclick = closeModal;
+        
+        // Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+    }
+
+    createPropertyModalContent(property) {
+        const price = Utils.formatPrice(property.price, property.currency || '€');
+        const imageUrl = property.primary_image ? 
+            `/assets/images/properties/${property.primary_image}` : 
+            '/assets/images/placeholder-property.jpg';
+        
+        return `
+            <div class="property-modal-content">
+                <div class="property-modal-image">
+                    <img src="${imageUrl}" alt="${Utils.escapeHtml(property.title)}">
+                </div>
+                <div class="property-modal-info">
+                    <div class="property-price">${price}</div>
+                    <div class="property-location">${property.address}, ${property.city}</div>
+                    <div class="property-description">${Utils.escapeHtml(property.description || '')}</div>
+                    <div class="property-details-grid">
+                        ${property.surface_useful ? `<div><strong>Suprafață utilă:</strong> ${property.surface_useful} mp</div>` : ''}
+                        ${property.rooms ? `<div><strong>Camere:</strong> ${property.rooms}</div>` : ''}
+                        ${property.bedrooms ? `<div><strong>Dormitoare:</strong> ${property.bedrooms}</div>` : ''}
+                        ${property.bathrooms ? `<div><strong>Băi:</strong> ${property.bathrooms}</div>` : ''}
+                        ${property.floor ? `<div><strong>Etaj:</strong> ${property.floor}</div>` : ''}
+                        ${property.construction_year ? `<div><strong>An construcție:</strong> ${property.construction_year}</div>` : ''}
+                    </div>
+                    <div class="property-contact">
+                        <strong>Contact:</strong> ${property.agent_name || 'Agent'}<br>
+                        ${property.agent_email || ''} ${property.agent_phone || ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    handleFavoriteClick(button) {
+        const propertyId = button.dataset.propertyId;
+        if (!propertyId) return;
+        
+        // For now, just toggle visual state. Auth will be implemented in Stage 6
+        button.classList.toggle('active');
+        const isActive = button.classList.contains('active');
+        button.innerHTML = isActive ? '♥' : '♡';
+        
+        this.messageSystem.info(
+            isActive ? 'Proprietate adăugată la favorite' : 'Proprietate eliminată din favorite',
+            3000
+        );
+    }
+
+    setupBackToTop() {
+        if (!this.elements.backToTop) return;
+        
+        const toggleBackToTop = Utils.throttle(() => {
+            const scrolled = window.pageYOffset > 300;
+            this.elements.backToTop.classList.toggle('visible', scrolled);
+        }, 100);
+        
+        window.addEventListener('scroll', toggleBackToTop);
+    }
+
+    scrollToTop() {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    }
+
+    showLoading() {
+        if (this.elements.loadingContainer) {
+            this.elements.loadingContainer.style.display = 'block';
+        }
+        if (this.elements.grid) {
+            this.elements.grid.style.display = 'none';
+        }
+    }
+
+    hideLoading() {
+        if (this.elements.loadingContainer) {
+            this.elements.loadingContainer.style.display = 'none';
+        }
+        if (this.elements.grid) {
+            this.elements.grid.style.display = 'grid';
+        }
+    }
+
+    showError(message = 'A apărut o eroare') {
+        if (this.elements.errorContainer) {
+            this.elements.errorContainer.style.display = 'block';
+            const errorMessage = this.elements.errorContainer.querySelector('#error-message');
+            if (errorMessage) {
+                errorMessage.textContent = message;
+            }
+        }
+        if (this.elements.grid) {
+            this.elements.grid.style.display = 'none';
+        }
+    }
+
+    hideError() {
+        if (this.elements.errorContainer) {
+            this.elements.errorContainer.style.display = 'none';
+        }
+    }
+
+    showEmpty() {
+        if (this.elements.emptyContainer) {
+            this.elements.emptyContainer.style.display = 'block';
+        }
+        if (this.elements.grid) {
+            this.elements.grid.style.display = 'none';
+        }
+    }
+
+    hideEmpty() {
+        if (this.elements.emptyContainer) {
+            this.elements.emptyContainer.style.display = 'none';
+        }
+    }
+}
+
+// ======================================
 // Global Functions
 // ======================================
 
@@ -1267,29 +2171,81 @@ window.contactProperty = function(propertyId) {
 // Main Application Initialization
 // ======================================
 
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        // Initialize core systems
-        window.apiHandler = new APIHandler();
-        window.loadingManager = new LoadingManager();
-        window.messageSystem = new MessageSystem();
-        
-        // Initialize UI components
-        window.navigation = new Navigation();
-        window.formHandler = new FormHandler();
-        window.authModal = new AuthModal();
-        window.statsCounter = new StatsCounter();
-        
-        // Initialize map (Stage 3 feature)
-        window.mapManager = new MapManager();
-        
-        // Hide initial loading
-        loadingManager.hideAll();
-        
-        console.log('🏠 REMS application initialized successfully');
-        
-    } catch (error) {
-        console.error('Failed to initialize application:', error);
-        messageSystem?.error('Eroare la inițializarea aplicației');
+// Global App object
+window.App = {
+    apiHandler: null,
+    loadingManager: null,
+    messageSystem: null,
+    navigation: null,
+    formHandler: null,
+    authModal: null,
+    statsCounter: null,
+    mapManager: null,
+    propertyListing: null,
+    
+    // Initialize the application
+    async init() {
+        try {
+            console.log('🏠 Initializing REMS application...');
+            
+            // Initialize core systems
+            this.apiHandler = new APIHandler();
+            this.loadingManager = new LoadingManager();
+            this.messageSystem = new MessageSystem();
+            
+            await this.apiHandler.init();
+            
+            // Initialize UI components
+            this.navigation = new Navigation();
+            this.formHandler = new FormHandler();
+            this.authModal = new AuthModal();
+            this.statsCounter = new StatsCounter();
+            
+            // Initialize map (Stage 3 feature)
+            this.mapManager = new MapManager();
+            
+            // Initialize property listing (Stage 5)
+            this.propertyListing = new PropertyListing();
+            
+            // Initialize all components
+            await this.navigation.init();
+            await this.formHandler.init();
+            await this.authModal.init();
+            await this.statsCounter.init();
+            
+            // Initialize map if on a page with map
+            if (document.getElementById('map-container')) {
+                await this.mapManager.init();
+            }
+            
+            // Initialize property listing if on properties page
+            if (document.getElementById('properties-grid')) {
+                await this.propertyListing.init();
+            }
+            
+            // Expose instances globally for backward compatibility
+            window.apiHandler = this.apiHandler;
+            window.loadingManager = this.loadingManager;
+            window.messageSystem = this.messageSystem;
+            window.navigation = this.navigation;
+            window.formHandler = this.formHandler;
+            window.authModal = this.authModal;
+            window.statsCounter = this.statsCounter;
+            window.mapManager = this.mapManager;
+            window.propertyListing = this.propertyListing;
+            
+            // Hide initial loading
+            this.loadingManager.hideAll();
+            
+            console.log('🏠 REMS application initialized successfully');
+            
+        } catch (error) {
+            console.error('Failed to initialize application:', error);
+            this.messageSystem?.error('Eroare la inițializarea aplicației');
+        }
     }
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await window.App.init();
 }); 

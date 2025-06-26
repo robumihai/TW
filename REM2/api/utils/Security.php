@@ -55,7 +55,7 @@ class Security
     /**
      * Set security headers
      */
-    private function setSecurityHeaders(): void
+    public function setSecurityHeaders(): void
     {
         // Prevent MIME type sniffing
         header('X-Content-Type-Options: nosniff');
@@ -346,7 +346,7 @@ class Security
         
         // Clean up expired rate limit entries
         $this->db->execute(
-            "DELETE FROM rate_limits WHERE reset_at < ?",
+            "DELETE FROM rate_limits WHERE reset_time < ?",
             [$now]
         );
         
@@ -361,20 +361,18 @@ class Security
             $this->db->insert('rate_limits', [
                 'identifier' => $identifier,
                 'endpoint' => $endpoint,
-                'requests_count' => 1,
-                'window_start' => $now,
-                'reset_at' => date('Y-m-d H:i:s', time() + $this->config['rate_limit_window'])
+                'attempts' => 1,
+                'reset_time' => date('Y-m-d H:i:s', time() + $this->config['rate_limit_window'])
             ]);
             return true;
         }
         
         // Check if window has expired
-        if ($rateLimitInfo['window_start'] < $windowStart) {
+        if ($rateLimitInfo['reset_time'] < $now) {
             // Reset the window
             $this->db->update('rate_limits', [
-                'requests_count' => 1,
-                'window_start' => $now,
-                'reset_at' => date('Y-m-d H:i:s', time() + $this->config['rate_limit_window'])
+                'attempts' => 1,
+                'reset_time' => date('Y-m-d H:i:s', time() + $this->config['rate_limit_window'])
             ], [
                 'identifier' => $identifier,
                 'endpoint' => $endpoint
@@ -383,13 +381,13 @@ class Security
         }
         
         // Check if limit exceeded
-        if ($rateLimitInfo['requests_count'] >= $this->config['rate_limit_max_requests']) {
+        if ($rateLimitInfo['attempts'] >= $this->config['rate_limit_max_requests']) {
             return false;
         }
         
         // Increment request count
         $this->db->update('rate_limits', [
-            'requests_count' => $rateLimitInfo['requests_count'] + 1
+            'attempts' => $rateLimitInfo['attempts'] + 1
         ], [
             'identifier' => $identifier,
             'endpoint' => $endpoint

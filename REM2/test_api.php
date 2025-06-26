@@ -26,7 +26,7 @@ try {
     
     // Test search functionality
     echo "   Testing search...\n";
-    $searchResult = $property->search([], 1, 5);
+    $searchResult = $property->search([], ['page' => 1, 'limit' => 5]);
     echo "   ✅ Search works. Found " . $searchResult['pagination']['total'] . " properties\n";
     
     // Test featured properties
@@ -62,19 +62,19 @@ try {
     echo "\n5. Testing Search Filters...\n";
     
     // Test city filter
-    $cityResult = $property->search(['city' => 'București'], 1, 3);
+    $cityResult = $property->search(['city' => 'București'], ['page' => 1, 'limit' => 3]);
     echo "   ✅ City filter (București): " . $cityResult['pagination']['total'] . " properties\n";
     
     // Test property type filter
-    $typeResult = $property->search(['property_type' => 'apartment'], 1, 3);
+    $typeResult = $property->search(['property_type' => 'apartment'], ['page' => 1, 'limit' => 3]);
     echo "   ✅ Type filter (apartment): " . $typeResult['pagination']['total'] . " properties\n";
     
     // Test transaction type filter
-    $transactionResult = $property->search(['transaction_type' => 'sale'], 1, 3);
+    $transactionResult = $property->search(['transaction_type' => 'sale'], ['page' => 1, 'limit' => 3]);
     echo "   ✅ Transaction filter (sale): " . $transactionResult['pagination']['total'] . " properties\n";
     
     // Test price range filter
-    $priceResult = $property->search(['min_price' => 50000, 'max_price' => 200000], 1, 3);
+    $priceResult = $property->search(['min_price' => 50000, 'max_price' => 200000], ['page' => 1, 'limit' => 3]);
     echo "   ✅ Price range filter (50k-200k): " . $priceResult['pagination']['total'] . " properties\n";
     
     echo "\n6. Testing Map Functionality...\n";
@@ -85,7 +85,7 @@ try {
         'south' => 43.6,
         'east' => 29.7,
         'west' => 20.2
-    ], 1, 10);
+    ], ['page' => 1, 'limit' => 10]);
     echo "   ✅ Map bounding box search: " . $mapResult['pagination']['total'] . " properties\n";
     
     echo "\n7. Testing Advanced Features...\n";
@@ -97,7 +97,7 @@ try {
     }
     
     // Test sorting
-    $sortedResult = $property->search(['sort' => 'price_desc'], 1, 3);
+    $sortedResult = $property->search([], ['sort' => 'price_desc', 'page' => 1, 'limit' => 3]);
     echo "   ✅ Sorting works: " . count($sortedResult['data']) . " properties sorted by price desc\n";
     
     echo "\n=== ALL TESTS PASSED! ===\n";

@@ -328,7 +328,7 @@ class Database
      */
     private function logQuery(string $sql, array $params, float $executionTime): void
     {
-        if ($this->config['settings']['log_queries']) {
+        if (isset($this->config['settings']['log_queries']) && $this->config['settings']['log_queries']) {
             $this->queryLog[] = [
                 'sql' => $sql,
                 'params' => $params,
@@ -337,7 +337,8 @@ class Database
             ];
             
             // Log slow queries
-            if ($executionTime > $this->config['settings']['slow_query_threshold']) {
+            $slowQueryThreshold = $this->config['settings']['slow_query_threshold'] ?? 1.0;
+            if ($executionTime > $slowQueryThreshold) {
                 error_log("Slow query ({$executionTime}s): $sql");
             }
         }

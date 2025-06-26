@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proprietăți - REMS Real Estate Management System</title>
+    <meta name="description" content="Căutare și navigare prin proprietăți imobiliare disponibile în România. Filtrare avansată după preț, tip, locație și multe altele.">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="css/components.css">
+    
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self';">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    
+    <!-- Preload important resources -->
+    <link rel="preload" href="css/style.css" as="style">
+    <link rel="preload" href="js/main.js" as="script">
+    
+    <!-- Schema.org structured data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "Proprietăți REMS",
+        "description": "Căutare proprietăți imobiliare în România",
+        "url": "https://rems.example.com/properties.html"
+    }
+    </script>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" role="navigation" aria-label="Navigare principală">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="index.html" class="nav-logo">
+                    <span class="logo-icon">🏠</span>
+                    <span class="logo-text">REMS</span>
+                </a>
+            </div>
+            
+            <button class="nav-toggle" aria-label="Comutare meniu mobil" aria-expanded="false">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            
+            <div class="nav-menu">
+                <div class="nav-links">
+                    <a href="index.html" class="nav-link">Acasă</a>
+                    <a href="properties.html" class="nav-link active">Proprietăți</a>
+                    <a href="#" class="nav-link">Hartă</a>
+                    <a href="#" class="nav-link">Despre</a>
+                    <a href="#" class="nav-link">Contact</a>
+                </div>
+                
+                <div class="nav-actions">
+                    <a href="#" class="btn btn-outline">Conectare</a>
+                    <a href="#" class="btn btn-primary">Înregistrare</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero hero-small">
+        <div class="hero-overlay"></div>
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">Găsește-ți Proprietatea Ideală</h1>
+                <p class="hero-subtitle">Exploreaza peste <span id="total-properties">0</span> proprietăți din întreaga țară</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Search Filters -->
+    <section class="search-section">
+        <div class="container">
+            <div class="search-container">
+                <form class="search-form" id="property-search-form">
+                    <div class="search-row">
+                        <!-- Main search -->
+                        <div class="search-field search-field-main">
+                            <label for="search-query" class="sr-only">Căutare text</label>
+                            <input 
+                                type="text" 
+                                id="search-query"
+                                name="search" 
+                                placeholder="Căutare după titlu, descriere, adresă..."
+                                class="form-input"
+                            >
+                        </div>
+                        
+                        <!-- Property type -->
+                        <div class="search-field">
+                            <label for="property-type" class="sr-only">Tip proprietate</label>
+                            <select id="property-type" name="property_type" class="form-select">
+                                <option value="">Tip proprietate</option>
+                                <option value="apartament">Apartament</option>
+                                <option value="casa">Casă</option>
+                                <option value="teren">Teren</option>
+                                <option value="comercial">Comercial</option>
+                                <option value="birou">Birou</option>
+                                <option value="garsoniera">Garsonieră</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Transaction type -->
+                        <div class="search-field">
+                            <label for="transaction-type" class="sr-only">Tip tranzacție</label>
+                            <select id="transaction-type" name="transaction_type" class="form-select">
+                                <option value="">Tip tranzacție</option>
+                                <option value="vanzare">Vânzare</option>
+                                <option value="inchiriere">Închiriere</option>
+                            </select>
+                        </div>
+                        
+                        <!-- City -->
+                        <div class="search-field">
+                            <label for="city" class="sr-only">Oraș</label>
+                            <select id="city" name="city" class="form-select">
+                                <option value="">Selectează orașul</option>
+                                <!-- Will be populated dynamically -->
+                            </select>
+                        </div>
+                        
+                        <!-- Search button -->
+                        <div class="search-field">
+                            <button type="submit" class="btn btn-primary btn-search">
+                                <span class="btn-text">Căutare</span>
+                                <span class="btn-icon">🔍</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced filters (collapsible) -->
+                    <div class="advanced-filters" id="advanced-filters">
+                        <div class="advanced-filters-content">
+                            <div class="filter-row">
+                                <!-- Price range -->
+                                <div class="filter-group">
+                                    <label class="filter-label">Preț (€)</label>
+                                    <div class="filter-range">
+                                        <input 
+                                            type="number" 
+                                            name="min_price" 
+                                            placeholder="Min" 
+                                            class="form-input form-input-small"
+                                            min="0"
+                                            step="1000"
+                                        >
+                                        <span class="range-separator">-</span>
+                                        <input 
+                                            type="number" 
+                                            name="max_price" 
+                                            placeholder="Max" 
+                                            class="form-input form-input-small"
+                                            min="0"
+                                            step="1000"
+                                        >
+                                    </div>
+                                </div>
+                                
+                                <!-- Surface range -->
+                                <div class="filter-group">
+                                    <label class="filter-label">Suprafață (mp)</label>
+                                    <div class="filter-range">
+                                        <input 
+                                            type="number" 
+                                            name="min_surface" 
+                                            placeholder="Min" 
+                                            class="form-input form-input-small"
+                                            min="0"
+                                            step="10"
+                                        >
+                                        <span class="range-separator">-</span>
+                                        <input 
+                                            type="number" 
+                                            name="max_surface" 
+                                            placeholder="Max" 
+                                            class="form-input form-input-small"
+                                            min="0"
+                                            step="10"
+                                        >
+                                    </div>
+                                </div>
+                                
+                                <!-- Rooms -->
+                                <div class="filter-group">
+                                    <label for="rooms" class="filter-label">Camere</label>
+                                    <select id="rooms" name="rooms" class="form-select">
+                                        <option value="">Orice</option>
+                                        <option value="1">1+</option>
+                                        <option value="2">2+</option>
+                                        <option value="3">3+</option>
+                                        <option value="4">4+</option>
+                                        <option value="5">5+</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Bedrooms -->
+                                <div class="filter-group">
+                                    <label for="bedrooms" class="filter-label">Dormitoare</label>
+                                    <select id="bedrooms" name="bedrooms" class="form-select">
+                                        <option value="">Orice</option>
+                                        <option value="1">1+</option>
+                                        <option value="2">2+</option>
+                                        <option value="3">3+</option>
+                                        <option value="4">4+</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Bathrooms -->
+                                <div class="filter-group">
+                                    <label for="bathrooms" class="filter-label">Băi</label>
+                                    <select id="bathrooms" name="bathrooms" class="form-select">
+                                        <option value="">Orice</option>
+                                        <option value="1">1+</option>
+                                        <option value="2">2+</option>
+                                        <option value="3">3+</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="filter-actions">
+                                <button type="button" class="btn btn-outline btn-sm" id="clear-filters">
+                                    Șterge filtrele
+                                </button>
+                                <button type="button" class="btn btn-outline btn-sm" id="toggle-advanced">
+                                    <span class="toggle-text">Ascunde filtrele avansate</span>
+                                    <span class="toggle-icon">▲</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Toggle advanced filters button (when collapsed) -->
+                    <div class="advanced-toggle" id="advanced-toggle">
+                        <button type="button" class="btn btn-outline btn-sm" id="show-advanced">
+                            <span>Filtre avansate</span>
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="results-section">
+        <div class="container">
+            <!-- Results header -->
+            <div class="results-header">
+                <div class="results-info">
+                    <h2 class="results-title">
+                        <span id="results-count">0</span> proprietăți găsite
+                    </h2>
+                    <p class="results-subtitle" id="results-subtitle">
+                        Găsește proprietatea potrivită pentru tine
+                    </p>
+                </div>
+                
+                <div class="results-controls">
+                    <!-- Sort dropdown -->
+                    <div class="sort-control">
+                        <label for="sort-select" class="sr-only">Sortare</label>
+                        <select id="sort-select" name="sort" class="form-select form-select-sm">
+                            <option value="newest">Cele mai noi</option>
+                            <option value="price_asc">Preț crescător</option>
+                            <option value="price_desc">Preț descrescător</option>
+                            <option value="surface_asc">Suprafață crescătoare</option>
+                            <option value="surface_desc">Suprafață descrescătoare</option>
+                            <option value="featured">Recomandate</option>
+                        </select>
+                    </div>
+                    
+                    <!-- View toggle -->
+                    <div class="view-toggle">
+                        <button type="button" class="view-btn active" data-view="grid" aria-label="Vizualizare grilă">
+                            <span class="view-icon">⊞</span>
+                        </button>
+                        <button type="button" class="view-btn" data-view="list" aria-label="Vizualizare listă">
+                            <span class="view-icon">☰</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Loading state -->
+            <div class="loading-container" id="loading-container">
+                <div class="loading-spinner"></div>
+                <p class="loading-text">Se încarcă proprietățile...</p>
+            </div>
+            
+            <!-- Error state -->
+            <div class="error-container" id="error-container" style="display: none;">
+                <div class="error-content">
+                    <h3 class="error-title">Oops! Ceva nu a mers bine</h3>
+                    <p class="error-message" id="error-message">Nu am putut încărca proprietățile. Te rog să încerci din nou.</p>
+                    <button type="button" class="btn btn-primary" id="retry-button">
+                        Încearcă din nou
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Empty state -->
+            <div class="empty-container" id="empty-container" style="display: none;">
+                <div class="empty-content">
+                    <h3 class="empty-title">Nu am găsit proprietăți</h3>
+                    <p class="empty-message">Încearcă să modifici criteriile de căutare pentru a vedea mai multe rezultate.</p>
+                    <button type="button" class="btn btn-outline" id="clear-search">
+                        Șterge toate filtrele
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Properties grid -->
+            <div class="properties-grid" id="properties-grid">
+                <!-- Properties will be loaded here dynamically -->
+            </div>
+            
+            <!-- Pagination -->
+            <div class="pagination-container" id="pagination-container">
+                <nav class="pagination" role="navigation" aria-label="Navigare pagini">
+                    <!-- Pagination will be generated dynamically -->
+                </nav>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick filters (floating on mobile) -->
+    <div class="quick-filters" id="quick-filters">
+        <button type="button" class="quick-filter-btn" data-filter="featured=1">
+            Recomandate
+        </button>
+        <button type="button" class="quick-filter-btn" data-filter="transaction_type=vanzare">
+            De vânzare
+        </button>
+        <button type="button" class="quick-filter-btn" data-filter="transaction_type=inchiriere">
+            De închiriat
+        </button>
+        <button type="button" class="quick-filter-btn" data-filter="property_type=apartament">
+            Apartamente
+        </button>
+        <button type="button" class="quick-filter-btn" data-filter="property_type=casa">
+            Case
+        </button>
+    </div>
+
+    <!-- Back to top button -->
+    <button class="back-to-top" id="back-to-top" aria-label="Înapoi sus">
+        <span class="back-to-top-icon">↑</span>
+    </button>
+
+    <!-- Property Detail Modal (for quick view) -->
+    <div class="modal" id="property-modal" role="dialog" aria-labelledby="modal-title" aria-hidden="true">
+        <div class="modal-overlay" role="button" aria-label="Închide modal"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Detalii proprietate</h3>
+                <button class="modal-close" aria-label="Închide modal">×</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Property details will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-brand">
+                        <span class="logo-icon">🏠</span>
+                        <span class="logo-text">REMS</span>
+                    </div>
+                    <p class="footer-description">
+                        Sistemul de management imobiliar pentru România. 
+                        Găsește și gestionează proprietăți cu ușurință.
+                    </p>
+                </div>
+                
+                <div class="footer-section">
+                    <h4 class="footer-title">Proprietăți</h4>
+                    <ul class="footer-links">
+                        <li><a href="properties.html?transaction_type=vanzare">De vânzare</a></li>
+                        <li><a href="properties.html?transaction_type=inchiriere">De închiriat</a></li>
+                        <li><a href="properties.html?featured=1">Recomandate</a></li>
+                        <li><a href="properties.html?property_type=apartament">Apartamente</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4 class="footer-title">Companie</h4>
+                    <ul class="footer-links">
+                        <li><a href="#about">Despre noi</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                        <li><a href="#privacy">Confidențialitate</a></li>
+                        <li><a href="#terms">Termeni</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4 class="footer-title">Contact</h4>
+                    <ul class="footer-contact">
+                        <li>📧 contact@rems.ro</li>
+                        <li>📞 +40 21 123 4567</li>
+                        <li>📍 București, România</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2024 REMS - Real Estate Management System. Toate drepturile rezervate.</p>
+                <p class="footer-tech">Dezvoltat cu PHP, JavaScript și ❤️</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/main.js"></script>
+    <script>
+        // Initialize properties page when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.App) {
+                window.App.init();
+                
+                // Initialize properties listing
+                if (window.App.PropertyListing) {
+                    window.App.PropertyListing.init();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

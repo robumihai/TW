@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Check rate limit for API calls
-if (!$security->checkRateLimit('api', 100, 3600)) {
+if (!$security->checkRateLimit('api', 'properties')) {
     $response->error('Rate limit exceeded', 429);
 }
 
@@ -191,7 +191,7 @@ function handlePropertySearch(Property $property, Response $response): void
         $filters['sort'] = $_GET['sort'];
     }
     
-    $result = $property->search($filters, $page, $limit);
+    $result = $property->search($filters, ['page' => $page, 'limit' => $limit]);
     $response->success($result);
 }
 

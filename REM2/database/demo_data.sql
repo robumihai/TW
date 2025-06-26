@@ -1,150 +1,236 @@
--- REMS Demo Data
--- Sample properties for testing map functionality
+-- =============================================================================
+-- REMS - Demo Data
+-- Sample data for testing the Real Estate Management System
+-- =============================================================================
 
--- Demo properties with Romania coordinates
+-- Clear existing data (except configuration)
+DELETE FROM property_views;
+DELETE FROM property_images;
+DELETE FROM favorites;
+DELETE FROM search_history;
+
+DELETE FROM properties;
+DELETE FROM users WHERE id != 1; -- Keep admin user
+
+-- Insert demo users
+INSERT INTO users (id, name, email, password, phone, role, status, created_at, updated_at) VALUES
+(2, 'Maria Popescu', 'maria@example.com', '$2y$10$example_hash_here', '+40721234567', 'agent', 'active', datetime('now', '-30 days'), datetime('now', '-1 day')),
+(3, 'Ion Marinescu', 'ion@example.com', '$2y$10$example_hash_here', '+40722345678', 'agent', 'active', datetime('now', '-25 days'), datetime('now', '-2 days')),
+(4, 'Ana Constantinescu', 'ana@example.com', '$2y$10$example_hash_here', '+40723456789', 'agent', 'active', datetime('now', '-20 days'), datetime('now', '-3 days')),
+(5, 'Mihai Stoica', 'mihai@example.com', '$2y$10$example_hash_here', '+40724567890', 'user', 'active', datetime('now', '-15 days'), datetime('now', '-1 day')),
+(6, 'Elena Vasilescu', 'elena@example.com', '$2y$10$example_hash_here', '+40725678901', 'user', 'active', datetime('now', '-10 days'), datetime('now', '-2 days'));
+
+-- Insert demo properties
 INSERT INTO properties (
-    user_id, title, slug, description, property_type, transaction_type, 
-    price, currency, address, city, postal_code, county, country,
-    latitude, longitude, surface_total, surface_useful, rooms, bedrooms, bathrooms,
-    floor, total_floors, construction_year, condition_type, heating_type,
-    parking_spaces, utilities, amenities, status, featured, created_at, updated_at
-) VALUES 
--- Bucharest Properties
-(1, 'Apartament 3 camere Herastrau', 'apartament-3-camere-herastrau', 
- 'Apartament modern cu 3 camere în zona Herastrau, cu vedere la parc. Complet mobilat și utilat, gata de mutat.', 
- 'apartment', 'sale', 185000, 'EUR', 'Șoseaua Nordului 15', 'București', '014104', 'București', 'România',
- 44.4795, 26.0894, 85, 75, 3, 2, 1, 4, 8, 2018, 'new', 'central', 1,
- '["electricity","water","gas","internet","cable"]', '["elevator","parking","balcony","air_conditioning"]', 
- 'active', true, datetime('now'), datetime('now')),
+    id, user_id, title, slug, description, property_type, transaction_type, price, currency,
+    address, city, county, postal_code, latitude, longitude,
+    surface_total, surface_useful, rooms, bedrooms, bathrooms, floor, total_floors,
+    construction_year, condition_type, heating_type, parking_spaces,
+    utilities, amenities, featured, status, view_count,
+    created_at, updated_at
+) VALUES
 
-(1, 'Penthouse de lux Primaverii', 'penthouse-lux-primaverii',
- 'Penthouse spectaculos cu 4 camere și terasă de 50mp în zona Primaverii. Finisaje premium și vedere panoramică.',
- 'penthouse', 'sale', 420000, 'EUR', 'Calea Primaverii 22', 'București', '013975', 'București', 'România',
- 44.4739, 26.0894, 150, 120, 4, 3, 2, 12, 12, 2020, 'new', 'central', 2,
- '["electricity","water","gas","internet","cable"]', '["elevator","parking","terrace","air_conditioning","security"]',
- 'active', true, datetime('now'), datetime('now')),
+-- Bucuresti Properties
+(1, 2, 'Apartament modern 3 camere Floreasca', 'apartament-modern-3-camere-floreasca', 
+ 'Apartament modern și spațios în zona premium Floreasca. Mobilat și utilat complet, parcare subterană, vedere la Parcul Floreasca. Ideal pentru profesioniști.', 
+ 'apartment', 'sale', 185000, 'EUR',
+ 'Strada Floreasca nr. 15', 'București', 'București', '014453', 44.4732, 26.1062,
+ 85, 78, 3, 2, 1, 4, 8, 2019, 'new', 'central', 1,
+ '["gas", "electricity", "water", "sewage", "internet", "cable_tv"]',
+ '["parking", "elevator", "balcony", "central_heating", "air_conditioning", "furnished"]',
+ 1, 'active', 245,
+ datetime('now', '-25 days'), datetime('now', '-1 day')),
 
-(1, 'Apartament 2 camere Floreasca', 'apartament-2-camere-floreasca',
- 'Apartament confortabil cu 2 camere în zona Floreasca, aproape de metrou și centre comerciale.',
- 'apartment', 'rent', 800, 'EUR', 'Strada Barbu Văcărescu 201', 'București', '020276', 'București', 'România',
- 44.4856, 26.1026, 65, 55, 2, 1, 1, 7, 10, 2015, 'renovated', 'central', 1,
- '["electricity","water","gas","internet"]', '["elevator","parking","balcony"]',
- 'active', false, datetime('now'), datetime('now')),
+(2, 3, 'Vila superba Pipera - 5 camere', 'vila-superba-pipera-5-camere',
+ 'Vila individuală în complexul exclusivist din Pipera. Grădină mare, piscină, garaj pentru 2 mașini. Zona foarte liniștită și sigură cu pază 24/7.',
+ 'villa', 'sale', 420000, 'EUR',
+ 'Strada Iancu Nicolae nr. 88', 'București', 'Ilfov', '077190', 44.5142, 26.1396,
+ 320, 280, 5, 4, 3, 1, 2, 2018, 'very_good', 'central', 2,
+ '["gas", "electricity", "water", "sewage", "internet", "cable_tv", "alarm"]',
+ '["pool", "garden", "garage", "alarm_system", "air_conditioning", "fully_furnished"]',
+ 1, 'active', 189,
+ datetime('now', '-22 days'), datetime('now', '-2 days')),
+
+(3, 2, 'Garsonieră Universitate - investiție', 'garsoniera-universitate-investitie',
+ 'Garsonieră complet renovată în zona Universității. Perfectă pentru închiriere studenților sau tineri profesioniști. Randament de închiriere excelent.',
+ 'studio', 'sale', 65000, 'EUR',
+ 'Strada Academiei nr. 22', 'București', 'București', '010014', 44.4368, 26.0969,
+ 28, 25, 1, 0, 1, 2, 4, 1985, 'renovated', 'central', 0,
+ '["electricity", "water", "sewage", "internet"]',
+ '["elevator", "central_heating", "fully_renovated"]',
+ 0, 'active', 156,
+ datetime('now', '-20 days'), datetime('now', '-3 days')),
+
+(4, 4, 'Apartament 4 camere Herastrau - lux', 'apartament-4-camere-herastrau-lux',
+ 'Apartament de lux cu vedere la lacul Herăstrău. Finisaje premium, mobilat și utilat complet. Parcare subterană și boxa. Zona exclusivistă.',
+ 'apartment', 'sale', 350000, 'EUR',
+ 'Strada Kiseleff nr. 45', 'București', 'București', '011347', 44.4758, 26.0894,
+ 125, 110, 4, 3, 2, 8, 10, 2020, 'new', 'central', 1,
+ '["gas", "electricity", "water", "sewage", "internet", "cable_tv"]',
+ '["parking", "elevator", "balcony", "central_heating", "air_conditioning", "luxury_furniture"]',
+ 1, 'active', 378,
+ datetime('now', '-18 days'), datetime('now', '-1 day')),
 
 -- Cluj-Napoca Properties
-(1, 'Casa individuala Grigorescu', 'casa-individuala-grigorescu',
- 'Casă frumoasă cu 5 camere în cartierul Grigorescu, cu grădină și garaj. Zonă liniștită și verde.',
- 'house', 'sale', 280000, 'EUR', 'Strada Memorandumului 45', 'Cluj-Napoca', '400114', 'Cluj', 'România',
- 46.7712, 23.6236, 180, 150, 5, 4, 2, 0, 2, 2010, 'good', 'gas', 2,
- '["electricity","water","gas","internet"]', '["garden","garage","basement"]',
- 'active', true, datetime('now'), datetime('now')),
+(5, 2, 'Apartament nou Gheorgheni - 2 camere', 'apartament-nou-gheorgheni-2-camere',
+ 'Apartament nou în ansamblul rezidențial din Gheorgheni. Parcare inclusă, zonă verde, aproape de Iulius Mall și centru. Ideal pentru cuplu.',
+ 'apartment', 'sale', 95000, 'EUR',
+ 'Strada Observatorului nr. 12', 'Cluj-Napoca', 'Cluj', '400000', 46.7712, 23.6236,
+ 58, 52, 2, 1, 1, 3, 4, 2021, 'new', 'central', 1,
+ '["gas", "electricity", "water", "sewage", "internet", "cable_tv"]',
+ '["parking", "elevator", "balcony", "central_heating", "green_spaces"]',
+ 0, 'active', 134,
+ datetime('now', '-15 days'), datetime('now', '-4 days')),
 
-(1, 'Apartament 1 camera Centru', 'apartament-1-camera-centru-cluj',
- 'Studio modern în centrul Clujului, perfect pentru tineri sau investiție. Complet mobilat.',
- 'studio', 'rent', 450, 'EUR', 'Strada Universitații 12', 'Cluj-Napoca', '400091', 'Cluj', 'România',
- 46.7693, 23.5890, 35, 30, 1, 1, 1, 3, 5, 2019, 'new', 'central', 0,
- '["electricity","water","gas","internet","cable"]', '["elevator","air_conditioning"]',
- 'active', false, datetime('now'), datetime('now')),
+(6, 3, 'Casă individuală Florești', 'casa-individuala-floresti',
+ 'Casă nouă individuală în Florești. 4 camere, grădină mare, garaj, zonă foarte liniștită. La 15 minute de centrul Clujului.',
+ 'house', 'sale', 145000, 'EUR',
+ 'Strada Florilor nr. 23', 'Florești', 'Cluj', '407280', 46.7853, 23.5089,
+ 180, 150, 4, 3, 2, 1, 2, 2022, 'new', 'central', 1,
+ '["gas", "electricity", "water", "sewage", "internet"]',
+ '["garden", "garage", "central_heating", "concrete_fence"]',
+ 0, 'active', 89,
+ datetime('now', '-12 days'), datetime('now', '-2 days')),
 
--- Constanța Properties
-(1, 'Vila cu piscina Mamaia', 'vila-piscina-mamaia',
- 'Vilă luxoasă cu piscină și vedere la mare în Mamaia. Perfectă pentru vacanțe sau închiriere sezonieră.',
- 'villa', 'sale', 650000, 'EUR', 'Strada Remus Opreanu 8', 'Constanța', '900001', 'Constanța', 'România',
- 44.1621, 28.6348, 300, 250, 6, 5, 3, 0, 3, 2017, 'new', 'electric', 3,
- '["electricity","water","gas","internet","cable"]', '["pool","garden","terrace","garage","security"]',
- 'active', true, datetime('now'), datetime('now')),
+-- Constanta Properties
+(7, 4, 'Apartament cu vedere la mare - Mamaia', 'apartament-cu-vedere-la-mare-mamaia',
+ 'Apartament spectaculos cu vedere frontală la mare în Mamaia. 2 camere, mobilat, balcon mare. Perfect pentru vacanță sau închiriere sezonieră.',
+ 'apartment', 'sale', 125000, 'EUR',
+ 'Bulevardul Mamaia nr. 345', 'Constanța', 'Constanța', '900001', 44.2619, 28.6336,
+ 65, 58, 2, 1, 1, 7, 8, 2015, 'good', 'central', 0,
+ '["electricity", "water", "sewage", "internet", "cable_tv"]',
+ '["elevator", "balcony", "central_heating", "furnished", "sea_view"]',
+ 1, 'active', 267,
+ datetime('now', '-10 days'), datetime('now', '-1 day')),
 
--- Brașov Properties  
-(1, 'Apartament 3 camere Tampa', 'apartament-3-camere-tampa-brasov',
- 'Apartament spațios cu 3 camere și vedere la Tampa. Zona foarte căutată, aproape de centrul istoric.',
- 'apartment', 'sale', 145000, 'EUR', 'Strada Postăvarului 15', 'Brașov', '500001', 'Brașov', 'România',
- 45.6427, 25.5887, 78, 68, 3, 2, 1, 2, 4, 2016, 'good', 'gas', 1,
- '["electricity","water","gas","internet"]', '["parking","balcony","mountain_view"]',
- 'active', false, datetime('now'), datetime('now')),
+(8, 2, 'Vila moderna Mamaia Nord', 'vila-moderna-mamaia-nord',
+ 'Vila de lux cu piscină în Mamaia Nord. 6 camere, grădină amenajată, garaj dublu. La 200m de plajă. Perfectă pentru famiglia mare.',
+ 'villa', 'sale', 285000, 'EUR',
+ 'Strada Neptun nr. 67', 'Năvodari', 'Constanța', '905700', 44.3242, 28.6019,
+ 250, 220, 6, 4, 3, 1, 2, 2019, 'very_good', 'central', 2,
+ '["gas", "electricity", "water", "sewage", "internet", "cable_tv"]',
+ '["pool", "garden", "garage", "alarm_system", "air_conditioning"]',
+ 1, 'active', 198,
+ datetime('now', '-8 days'), datetime('now', '-1 day')),
 
--- Timișoara Properties
-(1, 'Casa renovata Fabric', 'casa-renovata-fabric-timisoara',
- 'Casă istorică complet renovată în cartierul Fabric. Arhitectură autentică cu facilități moderne.',
- 'house', 'sale', 195000, 'EUR', 'Strada Clemenceau 24', 'Timișoara', '300011', 'Timiș', 'România',
- 45.7597, 21.2137, 120, 100, 4, 3, 2, 0, 2, 1920, 'renovated', 'gas', 1,
- '["electricity","water","gas","internet"]', '["garden","basement","historical"]',
- 'active', false, datetime('now'), datetime('now')),
+-- Iasi Properties
+(9, 3, 'Apartament 3 camere Tatarasi', 'apartament-3-camere-tatarasi',
+ 'Apartament decomandat în zona Tătărași. Etaj intermediar, balcon închis, parcare. Aproape de școli și transport în comun.',
+ 'apartment', 'sale', 78000, 'EUR',
+ 'Strada Tătărași nr. 15', 'Iași', 'Iași', '700259', 47.1615, 27.5889,
+ 70, 62, 3, 2, 1, 5, 10, 2005, 'good', 'central', 0,
+ '["gas", "electricity", "water", "sewage", "internet"]',
+ '["elevator", "balcony", "central_heating", "outdoor_parking"]',
+ 0, 'active', 112,
+ datetime('now', '-6 days'), datetime('now', '-3 days')),
 
--- Iași Properties
-(1, 'Apartament 2 camere Copou', 'apartament-2-camere-copou-iasi',
- 'Apartament cu 2 camere în zona Copou, aproape de universități. Ideal pentru studenți sau tineri.',
- 'apartment', 'rent', 350, 'EUR', 'Bulevardul Carol I 15', 'Iași', '700505', 'Iași', 'România', 
- 47.1615, 27.5837, 55, 48, 2, 1, 1, 5, 8, 2014, 'good', 'central', 0,
- '["electricity","water","gas","internet"]', '["elevator","balcony"]',
- 'active', false, datetime('now'), datetime('now')),
+-- Timisoara Properties
+(10, 4, 'Penthouse exclusivist centru vechi', 'penthouse-exclusivist-centru-vechi',
+ 'Penthouse de lux în centrul istoric Timișoara. Terasă mare cu vedere panoramică, mobilat designer, 3 camere. Unic în oraș!',
+ 'penthouse', 'sale', 220000, 'EUR',
+ 'Piața Victoriei nr. 8', 'Timișoara', 'Timiș', '300006', 45.7494, 21.2272,
+ 95, 85, 3, 2, 2, 8, 8, 2017, 'very_good', 'central', 0,
+ '["gas", "electricity", "water", "sewage", "internet", "cable_tv"]',
+ '["terrace", "elevator", "central_heating", "luxury_furniture", "panoramic_view"]',
+ 1, 'active', 289,
+ datetime('now', '-5 days'), datetime('now', '-1 day')),
 
--- Sibiu Properties
-(1, 'Casa saseasca Centru Istoric', 'casa-saseasca-centru-istoric-sibiu',
- 'Casă săsească autentică în centrul istoric al Sibiului. Monument istoric cu potențial turistic.',
- 'house', 'sale', 320000, 'EUR', 'Strada Cetății 18', 'Sibiu', '550160', 'Sibiu', 'România',
- 45.7983, 24.1256, 200, 180, 6, 4, 2, 0, 3, 1650, 'renovated', 'gas', 0,
- '["electricity","water","gas","internet"]', '["historical","basement","courtyard"]',
- 'active', true, datetime('now'), datetime('now')),
+-- Rental Properties
+(11, 2, 'Apartament 2 camere închiriere Calea Victoriei', 'apartament-2-camere-inchiriere-calea-victoriei',
+ 'Apartament elegant pentru închiriere în centrul Bucureștiului. Mobilat complet, toate utilitățile incluse. Ideal pentru expați.',
+ 'apartment', 'rent', 800, 'EUR',
+ 'Calea Victoriei nr. 125', 'București', 'București', '010071', 44.4395, 26.0969,
+ 55, 48, 2, 1, 1, 3, 6, 2010, 'very_good', 'central', 0,
+ '["gas", "electricity", "water", "sewage", "internet", "cable_tv"]',
+ '["elevator", "balcony", "central_heating", "fully_furnished", "all_utilities_included"]',
+ 0, 'active', 78,
+ datetime('now', '-4 days'), datetime('now', '-1 day')),
 
--- Oradea Properties  
-(1, 'Apartament 3 camere Rogerius', 'apartament-3-camere-rogerius-oradea',
- 'Apartament modern cu 3 camere în ansamblul Rogerius. Finisaje de calitate și zonă verde.',
- 'apartment', 'sale', 89000, 'EUR', 'Strada Rogerius 45', 'Oradea', '410203', 'Bihor', 'România',
- 47.0379, 21.9294, 72, 62, 3, 2, 1, 1, 4, 2021, 'new', 'central', 1,
- '["electricity","water","gas","internet","cable"]', '["elevator","parking","playground"]',
- 'active', false, datetime('now'), datetime('now')),
+(12, 3, 'Casa închiriere Baneasa - grădină', 'casa-inchiriere-baneasa-gradina',
+ 'Casă frumoasă pentru închiriere în Băneasa. Grădină mare, garaj, perfect pentru familie. 4 camere, mobilată parțial.',
+ 'house', 'rent', 1200, 'EUR',
+ 'Strada Băneasa nr. 45', 'București', 'București', '013681', 44.5089, 26.0789,
+ 160, 140, 4, 3, 2, 1, 2, 2015, 'good', 'central', 1,
+ '["gas", "electricity", "water", "sewage", "internet"]',
+ '["garden", "garage", "central_heating", "partially_furnished"]',
+ 0, 'active', 67,
+ datetime('now', '-3 days'), datetime('now', '-1 day')),
 
--- Craiova Properties
-(1, 'Vila cu gradina Craiovita', 'vila-gradina-craiovita-craiova',
- 'Vilă spațioasă cu grădină mare în zona Craiovița. Perfectă pentru familii cu copii.',
- 'villa', 'sale', 175000, 'EUR', 'Strada Craiovița 78', 'Craiova', '200177', 'Dolj', 'România',
- 44.3302, 23.7949, 160, 140, 5, 4, 2, 0, 2, 2008, 'good', 'gas', 2,
- '["electricity","water","gas","internet"]', '["garden","garage","basement"]',
- 'active', false, datetime('now'), datetime('now')),
+-- More properties to reach good number for pagination testing
+(13, 2, 'Studio modern Universitate', 'studio-modern-universitate',
+ 'Studio modern, perfect pentru student sau tânăr profesionist. Zonă centrală, mobilat complet, preț excelent.',
+ 'studio', 'rent', 350, 'EUR',
+ 'Strada Universității nr. 7', 'București', 'București', '030167', 44.4343, 26.1013,
+ 25, 22, 1, 0, 1, 4, 5, 2018, 'very_good', 'central', 0,
+ '["electricity", "water", "sewage", "internet", "cable_tv"]',
+ '["elevator", "central_heating", "fully_furnished"]',
+ 0, 'active', 45,
+ datetime('now', '-2 days'), datetime('now', '-1 day')),
 
--- Commercial Properties
-(1, 'Spatiu comercial Calea Victoriei', 'spatiu-comercial-calea-victoriei',
- 'Spațiu comercial premium pe Calea Victoriei. Poziție excelentă pentru business de lux.',
- 'commercial', 'rent', 3500, 'EUR', 'Calea Victoriei 104', 'București', '010071', 'București', 'România',
- 44.4378, 26.0969, 120, 120, 0, 0, 2, 0, 4, 2005, 'renovated', 'central', 0,
- '["electricity","water","gas","internet"]', '["central_location","display_windows"]',
- 'active', true, datetime('now'), datetime('now')),
+(14, 3, 'Apartament 3 camere Drumul Taberei', 'apartament-3-camere-drumul-taberei',
+ 'Apartament spațios în Drumul Taberei, etaj 2, balcon mare, parcare în curte. Zona liniștită cu multe spații verzi.',
+ 'apartment', 'sale', 92000, 'EUR',
+ 'Strada Brașov nr. 33', 'București', 'București', '061344', 44.4128, 26.0436,
+ 75, 68, 3, 2, 1, 2, 4, 1995, 'renovated', 'central', 0,
+ '["gas", "electricity", "water", "sewage", "internet"]',
+ '["balcony", "central_heating", "courtyard_parking", "renovated"]',
+ 0, 'active', 87,
+ datetime('now', '-1 day'), datetime('now')),
 
-(1, 'Birou open space Floreasca', 'birou-open-space-floreasca',
- 'Birou modern tip open space în clădire nouă. Facilități complete pentru companii.',
- 'office', 'rent', 1200, 'EUR', 'Strada Barbu Văcărescu 164', 'București', '020276', 'București', 'România',
- 44.4856, 26.1026, 80, 80, 0, 0, 1, 8, 15, 2020, 'new', 'central', 2,
- '["electricity","water","gas","internet","cable"]', '["elevator","parking","air_conditioning","security"]',
- 'active', false, datetime('now'), datetime('now')),
-
--- Land Properties
-(1, 'Teren intravilan Baneasa', 'teren-intravilan-baneasa',
- 'Teren intravilan cu deschidere la drum, perfect pentru construcție casă. Zona în dezvoltare.',
- 'land', 'sale', 85000, 'EUR', 'Șoseaua Bucureștii Noi 156', 'București', '013682', 'București', 'România',
- 44.5294, 26.0711, 600, 600, 0, 0, 0, 0, 0, 0, 'undeveloped', 'none', 0,
- '["electricity","water"]', '["development_potential","road_access"]',
- 'active', false, datetime('now'), datetime('now'));
+(15, 4, 'Birou închiriere zona Nordului', 'birou-inchiriere-zona-nordului',
+ 'Spațiu de birou modern pentru închiriere. 3 camere, 2 băi, parcare, ideal pentru firmă mică sau cabinet.',
+ 'office', 'rent', 900, 'EUR',
+ 'Calea Dorobanți nr. 15', 'București', 'București', '010573', 44.4589, 26.1019,
+ 85, 80, 3, 0, 2, 2, 5, 2016, 'very_good', 'central', 2,
+ '["electricity", "water", "sewage", "internet", "cable_tv"]',
+ '["elevator", "central_heating", "parking", "air_conditioning"]',
+ 0, 'active', 34,
+ datetime('now'), datetime('now'));
 
 -- Insert sample property images
 INSERT INTO property_images (property_id, filename, alt_text, is_primary, sort_order, created_at) VALUES
-(1, 'apartment_herastrau_1.jpg', 'Living apartament Herastrau', 1, 1, datetime('now')),
-(1, 'apartment_herastrau_2.jpg', 'Bucătărie apartament Herastrau', 0, 2, datetime('now')),
-(2, 'penthouse_primaverii_1.jpg', 'Living penthouse Primaverii', 1, 1, datetime('now')),
-(3, 'apartment_floreasca_1.jpg', 'Living apartament Floreasca', 1, 1, datetime('now')),
-(4, 'house_grigorescu_1.jpg', 'Exterior casă Grigorescu', 1, 1, datetime('now')),
-(5, 'studio_cluj_1.jpg', 'Interior studio Cluj', 1, 1, datetime('now')),
-(6, 'villa_mamaia_1.jpg', 'Exterior vilă Mamaia', 1, 1, datetime('now')),
-(7, 'apartment_brasov_1.jpg', 'Living apartament Brașov', 1, 1, datetime('now')),
-(8, 'house_timisoara_1.jpg', 'Exterior casă Timișoara', 1, 1, datetime('now')),
-(9, 'apartment_iasi_1.jpg', 'Living apartament Iași', 1, 1, datetime('now')),
-(10, 'house_sibiu_1.jpg', 'Exterior casă Sibiu', 1, 1, datetime('now')),
-(11, 'apartment_oradea_1.jpg', 'Living apartament Oradea', 1, 1, datetime('now')),
-(12, 'villa_craiova_1.jpg', 'Exterior vilă Craiova', 1, 1, datetime('now')),
-(13, 'commercial_bucuresti_1.jpg', 'Interior spațiu comercial', 1, 1, datetime('now')),
-(14, 'office_floreasca_1.jpg', 'Birou open space', 1, 1, datetime('now')),
-(15, 'land_baneasa_1.jpg', 'Teren Băneasa', 1, 1, datetime('now'));
+(1, 'apartment_floreasca_1.jpg', 'Living apartament Floreasca', 1, 1, datetime('now', '-25 days')),
+(1, 'apartment_floreasca_2.jpg', 'Bucătărie apartament Floreasca', 0, 2, datetime('now', '-25 days')),
+(2, 'vila_pipera_1.jpg', 'Exterior vila Pipera', 1, 1, datetime('now', '-22 days')),
+(2, 'vila_pipera_2.jpg', 'Piscină vila Pipera', 0, 2, datetime('now', '-22 days')),
+(3, 'garsoniera_univ_1.jpg', 'Interior garsonieră Universitate', 1, 1, datetime('now', '-20 days')),
+(4, 'apartment_herastrau_1.jpg', 'Living apartament Herăstrău', 1, 1, datetime('now', '-18 days')),
+(5, 'apartment_cluj_1.jpg', 'Living apartament Cluj', 1, 1, datetime('now', '-15 days')),
+(6, 'casa_floresti_1.jpg', 'Exterior casă Florești', 1, 1, datetime('now', '-12 days')),
+(7, 'apartment_mamaia_1.jpg', 'Vedere mare apartament Mamaia', 1, 1, datetime('now', '-10 days')),
+(8, 'vila_mamaia_1.jpg', 'Vila cu piscină Mamaia Nord', 1, 1, datetime('now', '-8 days')),
+(9, 'apartment_iasi_1.jpg', 'Living apartament Iași', 1, 1, datetime('now', '-6 days')),
+(10, 'penthouse_tm_1.jpg', 'Terasă penthouse Timișoara', 1, 1, datetime('now', '-5 days')),
+(11, 'apartment_rent_buc_1.jpg', 'Apartament închiriere București', 1, 1, datetime('now', '-4 days')),
+(12, 'casa_rent_baneasa_1.jpg', 'Casă închiriere Băneasa', 1, 1, datetime('now', '-3 days')),
+(13, 'studio_univ_1.jpg', 'Studio Universitate', 1, 1, datetime('now', '-2 days')),
+(14, 'apartment_drumul_1.jpg', 'Apartament Drumul Taberei', 1, 1, datetime('now', '-1 day')),
+(15, 'birou_nord_1.jpg', 'Birou zona Nordului', 1, 1, datetime('now'));
 
--- Insert sample user for properties
-INSERT INTO users (name, email, password_hash, role, phone, email_verified_at, created_at, updated_at) VALUES
-('Agent Demo', 'agent@rems.ro', '$argon2id$v=19$m=65536,t=4,p=3$demo_hash', 'agent', '+40123456789', datetime('now'), datetime('now'), datetime('now'))
-ON CONFLICT(email) DO NOTHING; 
+-- Insert sample favorites
+INSERT INTO favorites (user_id, property_id, created_at) VALUES
+(5, 1, datetime('now', '-20 days')),
+(5, 4, datetime('now', '-15 days')),
+(5, 7, datetime('now', '-10 days')),
+(6, 2, datetime('now', '-18 days')),
+(6, 8, datetime('now', '-8 days')),
+(6, 10, datetime('now', '-5 days'));
+
+-- Insert sample search history
+INSERT INTO search_history (user_id, query_text, filters, results_count, created_at) VALUES
+(5, 'apartament bucuresti', '{"property_type":"apartment","city":"București"}', 8, datetime('now', '-10 days')),
+(5, 'casa cu gradina', '{"property_type":"house","amenities":["garden"]}', 3, datetime('now', '-8 days')),
+(6, 'vedere la mare', '{"search":"mare","city":"Constanța"}', 2, datetime('now', '-7 days')),
+(6, 'apartament 2 camere', '{"property_type":"apartment","rooms":"2"}', 5, datetime('now', '-5 days'));
+
+-- Insert sample property views
+INSERT INTO property_views (property_id, ip_address, user_agent, viewed_at) VALUES
+(1, '192.168.1.100', 'Mozilla/5.0...', datetime('now', '-1 day')),
+(1, '192.168.1.101', 'Mozilla/5.0...', datetime('now', '-6 hours')),
+(4, '192.168.1.100', 'Mozilla/5.0...', datetime('now', '-3 hours')),
+(7, '192.168.1.102', 'Mozilla/5.0...', datetime('now', '-2 hours')),
+(10, '192.168.1.100', 'Mozilla/5.0...', datetime('now', '-1 hour'));
+
+
+
+ 

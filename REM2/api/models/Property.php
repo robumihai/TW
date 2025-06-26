@@ -213,6 +213,305 @@ class Property
         return $property;
     }
 
+    /**
+     * Get all properties with filtering, sorting and pagination
+     */
+    public function getAll(array $options = []): array
+    {
+        $filters = $options['filters'] ?? [];
+        $page = max(1, $options['page'] ?? 1);
+        $limit = min(100, max(1, $options['limit'] ?? 12));
+        $sort = $options['sort'] ?? 'newest';
+        $offset = ($page - 1) * $limit;
+
+        // Build WHERE clause
+        $where = ['p.status = ?'];
+        $params = ['active'];
+
+        // Apply filters
+        if (!empty($filters['search'])) {
+            $where[] = "(p.title LIKE ? OR p.description LIKE ? OR p.address LIKE ? OR p.city LIKE ?)";
+            $searchTerm = '%' . $filters['search'] . '%';
+            $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm]);
+        }
+
+        if (!empty($filters['property_type'])) {
+            $where[] = "p.property_type = ?";
+            $params[] = $filters['property_type'];
+        }
+
+        if (!empty($filters['transaction_type'])) {
+            $where[] = "p.transaction_type = ?";
+            $params[] = $filters['transaction_type'];
+        }
+
+        if (!empty($filters['city'])) {
+            $where[] = "p.city = ?";
+            $params[] = $filters['city'];
+        }
+
+        if (!empty($filters['min_price'])) {
+            $where[] = "p.price >= ?";
+            $params[] = (float)$filters['min_price'];
+        }
+
+        if (!empty($filters['max_price'])) {
+            $where[] = "p.price <= ?";
+            $params[] = (float)$filters['max_price'];
+        }
+
+        if (!empty($filters['rooms'])) {
+            $where[] = "p.rooms = ?";
+            $params[] = (int)$filters['rooms'];
+        }
+
+        if (!empty($filters['bedrooms'])) {
+            $where[] = "p.bedrooms = ?";
+            $params[] = (int)$filters['bedrooms'];
+        }
+
+        if (!empty($filters['bathrooms'])) {
+            $where[] = "p.bathrooms = ?";
+            $params[] = (int)$filters['bathrooms'];
+        }
+
+        if (!empty($filters['min_surface'])) {
+            $where[] = "p.surface_useful >= ?";
+            $params[] = (float)$filters['min_surface'];
+        }
+
+        if (!empty($filters['max_surface'])) {
+            $where[] = "p.surface_useful <= ?";
+            $params[] = (float)$filters['max_surface'];
+        }
+
+        if (!empty($filters['construction_year_min'])) {
+            $where[] = "p.construction_year >= ?";
+            $params[] = (int)$filters['construction_year_min'];
+        }
+
+        if (!empty($filters['construction_year_max'])) {
+            $where[] = "p.construction_year <= ?";
+            $params[] = (int)$filters['construction_year_max'];
+        }
+
+        if (!empty($filters['featured'])) {
+            $where[] = "p.featured = ?";
+            $params[] = $filters['featured'] ? 1 : 0;
+        }
+
+        // Build ORDER BY clause
+        $orderBy = match($sort) {
+            'price_asc' => 'p.price ASC',
+            'price_desc' => 'p.price DESC',
+            'surface_asc' => 'p.surface_useful ASC',
+            'surface_desc' => 'p.surface_useful DESC',
+            'oldest' => 'p.created_at ASC',
+            'views' => 'p.view_count DESC',
+            'featured' => 'p.featured DESC, p.created_at DESC',
+            default => 'p.created_at DESC'
+        };
+
+        // Count total results
+        $countSql = "
+            SELECT COUNT(*) 
+            FROM properties p 
+            LEFT JOIN users u ON p.user_id = u.id 
+            WHERE " . implode(' AND ', $where);
+        
+        $total = $this->db->queryScalar($countSql, $params);
+
+        // Get properties
+        $sql = "
+            SELECT p.*, 
+                   u.name as agent_name, u.email as agent_email, u.phone as agent_phone,
+                   (SELECT COUNT(*) FROM favorites WHERE property_id = p.id) as favorite_count,
+                   (SELECT filename FROM property_images WHERE property_id = p.id AND is_primary = 1 LIMIT 1) as primary_image,
+                   (SELECT COUNT(*) FROM property_images WHERE property_id = p.id) as image_count
+            FROM properties p 
+            LEFT JOIN users u ON p.user_id = u.id 
+            WHERE " . implode(' AND ', $where) . "
+            ORDER BY {$orderBy}
+            LIMIT {$limit} OFFSET {$offset}
+        ";
+
+        $properties = $this->db->query($sql, $params);
+
+        // Process results
+        foreach ($properties as &$property) {
+            // Decode JSON fields
+            $property['utilities'] = json_decode($property['utilities'] ?? '[]', true);
+            $property['amenities'] = json_decode($property['amenities'] ?? '[]', true);
+            
+            // Add human-readable fields
+            $property['property_type_label'] = $this->propertyTypes[$property['property_type']] ?? $property['property_type'];
+            $property['transaction_type_label'] = $this->transactionTypes[$property['transaction_type']] ?? $property['transaction_type'];
+            $property['condition_type_label'] = $this->conditionTypes[$property['condition_type']] ?? $property['condition_type'];
+        }
+
+        // Calculate pagination
+        $totalPages = ceil($total / $limit);
+
+        return [
+            'data' => $properties,
+            'pagination' => [
+                'current_page' => $page,
+                'total_pages' => $totalPages,
+                'total' => $total,
+                'limit' => $limit,
+                'has_prev' => $page > 1,
+                'has_next' => $page < $totalPages
+            ]
+        ];
+    }
+
+    /**
+     * Search properties with advanced filters
+     */
+    public function search(array $filters = [], array $options = []): array
+    {
+        return $this->getAll(['filters' => $filters] + $options);
+    }
+
+    /**
+     * Get property statistics
+     */
+    public function getStatistics(): array
+    {
+        $stats = [];
+
+        // Total properties
+        $stats['total_properties'] = $this->db->queryScalar("SELECT COUNT(*) FROM properties WHERE status = 'active'");
+
+        // Properties by type
+        $sql = "SELECT property_type, COUNT(*) as count FROM properties WHERE status = 'active' GROUP BY property_type";
+        $typeStats = $this->db->query($sql);
+        $stats['by_type'] = [];
+        foreach ($typeStats as $stat) {
+            $stats['by_type'][$stat['property_type']] = [
+                'count' => $stat['count'],
+                'label' => $this->propertyTypes[$stat['property_type']] ?? $stat['property_type']
+            ];
+        }
+
+        // Properties by transaction type
+        $sql = "SELECT transaction_type, COUNT(*) as count FROM properties WHERE status = 'active' GROUP BY transaction_type";
+        $transactionStats = $this->db->query($sql);
+        $stats['by_transaction'] = [];
+        foreach ($transactionStats as $stat) {
+            $stats['by_transaction'][$stat['transaction_type']] = [
+                'count' => $stat['count'],
+                'label' => $this->transactionTypes[$stat['transaction_type']] ?? $stat['transaction_type']
+            ];
+        }
+
+        // Price statistics
+        $sql = "
+            SELECT 
+                MIN(price) as min_price,
+                MAX(price) as max_price,
+                AVG(price) as avg_price,
+                transaction_type
+            FROM properties 
+            WHERE status = 'active' AND price > 0
+            GROUP BY transaction_type
+        ";
+        $priceStats = $this->db->query($sql);
+        $stats['price'] = [];
+        foreach ($priceStats as $stat) {
+            $stats['price'][$stat['transaction_type']] = [
+                'min' => (float)$stat['min_price'],
+                'max' => (float)$stat['max_price'],
+                'avg' => (float)$stat['avg_price']
+            ];
+        }
+
+        // Top cities
+        $sql = "
+            SELECT city, COUNT(*) as count 
+            FROM properties 
+            WHERE status = 'active' 
+            GROUP BY city 
+            ORDER BY count DESC 
+            LIMIT 10
+        ";
+        $stats['top_cities'] = $this->db->query($sql);
+
+        // Recent properties
+        $sql = "
+            SELECT COUNT(*) as count 
+            FROM properties 
+            WHERE status = 'active' 
+            AND created_at >= date('now', '-7 days')
+        ";
+        $stats['recent_week'] = $this->db->queryScalar($sql);
+
+        return $stats;
+    }
+
+    /**
+     * Get all unique cities from properties
+     */
+    public function getCities(): array
+    {
+        $sql = "
+            SELECT DISTINCT city 
+            FROM properties 
+            WHERE status = 'active' AND city IS NOT NULL AND city != ''
+            ORDER BY city ASC
+        ";
+        
+        $results = $this->db->query($sql);
+        return array_column($results, 'city');
+    }
+
+    /**
+     * Get featured properties
+     */
+    public function getFeatured(int $limit = 6): array
+    {
+        return $this->getAll([
+            'filters' => ['featured' => true],
+            'limit' => $limit,
+            'sort' => 'featured'
+        ])['data'];
+    }
+
+    /**
+     * Get similar properties
+     */
+    public function getSimilar(int $propertyId, int $limit = 4): array
+    {
+        $property = $this->findById($propertyId);
+        if (!$property) {
+            return [];
+        }
+
+        $filters = [
+            'property_type' => $property['property_type'],
+            'transaction_type' => $property['transaction_type']
+        ];
+
+        // Add price range (±30%)
+        if ($property['price'] > 0) {
+            $filters['min_price'] = $property['price'] * 0.7;
+            $filters['max_price'] = $property['price'] * 1.3;
+        }
+
+        $result = $this->getAll([
+            'filters' => $filters,
+            'limit' => $limit + 1, // Get one extra to exclude current property
+            'sort' => 'newest'
+        ]);
+
+        // Remove current property from results
+        $similar = array_filter($result['data'], function($p) use ($propertyId) {
+            return $p['id'] != $propertyId;
+        });
+
+        return array_slice($similar, 0, $limit);
+    }
+
     // Private helper methods
     private function validatePropertyData(array $data, ?int $existingId = null): void
     {

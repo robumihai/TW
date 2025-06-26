@@ -52,7 +52,7 @@ try {
     $resource = $pathParts[0] ?? '';
     
     // Global rate limiting
-    if (!$security->checkRateLimit('global_api', 200, 3600)) {
+    if (!$security->checkRateLimit('global_api', 'general')) {
         $response->error('Global rate limit exceeded. Please try again later.', 429);
     }
     

@@ -358,4 +358,4 @@ GROUP BY u.id;
 -- Note: SQLite FTS5 extension would be used for better search performance
 -- This would be implemented in the PHP layer for compatibility
 
-COMMIT; 
+ 
