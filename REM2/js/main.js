@@ -853,21 +853,31 @@ class MapManager {
                 </div>
                 <div class="popup-body">
                     <h4 class="popup-title">${Utils.escapeHtml(property.title)}</h4>
-                    <p class="popup-address">📍 ${Utils.escapeHtml(property.address)}, ${Utils.escapeHtml(property.city)}</p>
+                    <p class="popup-address">📍 ${Utils.escapeHtml(property.address || '')}, ${Utils.escapeHtml(property.city || '')}</p>
                     
                     <div class="popup-details">
                         <div class="popup-detail">
-                            <span class="popup-detail-value">${property.rooms || '-'}</span>
-                            <span class="popup-detail-label">Camere</span>
+                            <span class="popup-detail-value">${property.surface_useful}</span>
+                            <span class="popup-detail-label">mp</span>
                         </div>
-                        <div class="popup-detail">
-                            <span class="popup-detail-value">${Utils.formatArea(property.surface_useful)}</span>
-                            <span class="popup-detail-label">Suprafață</span>
-                        </div>
-                        <div class="popup-detail">
-                            <span class="popup-detail-value">${property.floor || '-'}</span>
-                            <span class="popup-detail-label">Etaj</span>
-                        </div>
+                        ${property.rooms ? `
+                            <div class="popup-detail">
+                                <span class="popup-detail-value">${property.rooms}</span>
+                                <span class="popup-detail-label">camere</span>
+                            </div>
+                        ` : ''}
+                        ${property.bathrooms ? `
+                            <div class="popup-detail">
+                                <span class="popup-detail-value">${property.bathrooms}</span>
+                                <span class="popup-detail-label">băi</span>
+                            </div>
+                        ` : ''}
+                        ${property.floor ? `
+                            <div class="popup-detail">
+                                <span class="popup-detail-value">${property.floor}</span>
+                                <span class="popup-detail-label">etaj</span>
+                            </div>
+                        ` : ''}
                     </div>
                     
                     <div class="popup-actions">
@@ -2154,130 +2164,630 @@ class PropertyListing {
 }
 
 // ======================================
-// Global Functions
+// Navigation Class
 // ======================================
 
-window.viewProperty = function(propertyId) {
-    messageSystem.info(`Redirectionare către proprietatea #${propertyId}`);
-    // TODO: Implement property details page
-};
-
-window.contactProperty = function(propertyId) {
-    messageSystem.info(`Deschidere formular contact pentru proprietatea #${propertyId}`);
-    // TODO: Implement contact functionality
-};
-
-// ======================================
-// Main Application Initialization
-// ======================================
-
-// Global App object
-window.App = {
-    apiHandler: null,
-    loadingManager: null,
-    messageSystem: null,
-    navigation: null,
-    formHandler: null,
-    authModal: null,
-    statsCounter: null,
-    mapManager: null,
-    propertyListing: null,
-    
-    // Initialize the application
-    async init() {
-        try {
-            console.log('🏠 Initializing REMS application...');
-            
-            // Initialize core systems
-            this.apiHandler = new APIHandler();
-            this.loadingManager = new LoadingManager();
-            this.messageSystem = new MessageSystem();
-            
-            await this.apiHandler.init();
-            
-            // Initialize UI components
-            this.navigation = new Navigation();
-            this.formHandler = new FormHandler();
-            this.authModal = new AuthModal();
-            this.statsCounter = new StatsCounter();
-            this.authManager = new AuthManager();
-            
-            // Initialize map (Stage 3 feature)
-            this.mapManager = new MapManager();
-            
-            // Initialize property listing (Stage 5)
-            this.propertyListing = new PropertyListing();
-            
-            // Initialize all components
-            await this.navigation.init();
-            await this.formHandler.init();
-            await this.authModal.init();
-            await this.statsCounter.init();
-            
-            // Initialize map if on a page with map
-            if (document.getElementById('map-container')) {
-                await this.mapManager.init();
-            }
-            
-            // Initialize property listing if on properties page
-            if (document.getElementById('properties-grid')) {
-                await this.propertyListing.init();
-            }
-            
-            // Expose instances globally for backward compatibility
-            window.apiHandler = this.apiHandler;
-            window.loadingManager = this.loadingManager;
-            window.messageSystem = this.messageSystem;
-            window.navigation = this.navigation;
-            window.formHandler = this.formHandler;
-            window.authModal = this.authModal;
-            window.statsCounter = this.statsCounter;
-            window.authManager = this.authManager;
-            window.mapManager = this.mapManager;
-            window.propertyListing = this.propertyListing;
-            
-            // Hide initial loading
-            this.loadingManager.hideAll();
-            
-            console.log('🏠 REMS application initialized successfully');
-            
-        } catch (error) {
-            console.error('Failed to initialize application:', error);
-            this.messageSystem?.error('Eroare la inițializarea aplicației');
-        }
-    }
-};
-
-document.addEventListener('DOMContentLoaded', async () => {
-    await window.App.init();
-});
-
-// ========================================================================
-// Authentication Management System
-// ========================================================================
-
-class AuthManager {
+class Navigation {
     constructor() {
-        this.apiBaseUrl = '/api_auth.php';
-        this.currentUser = null;
-        this.isAuthenticated = false;
-        this.csrfToken = null;
+        this.navToggle = document.querySelector('.nav-toggle');
+        this.navMenu = document.querySelector('.nav-menu');
+        this.navLinks = document.querySelectorAll('.nav-link');
         
-        // Initialize authentication state
         this.init();
     }
-    
-    /**
-     * Initialize authentication manager
-     */
-    async init() {
+
+    init() {
+        this.setupMobileMenu();
+        this.setupSmoothScrolling();
+        this.setupActiveLink();
+        this.setupThemeToggle();
+    }
+
+    setupMobileMenu() {
+        if (this.navToggle && this.navMenu) {
+            this.navToggle.addEventListener('click', () => {
+                this.navMenu.classList.toggle('active');
+                this.navToggle.classList.toggle('active');
+                
+                const isExpanded = this.navToggle.getAttribute('aria-expanded') === 'true';
+                this.navToggle.setAttribute('aria-expanded', !isExpanded);
+            });
+
+            // Close menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!this.navToggle.contains(e.target) && !this.navMenu.contains(e.target)) {
+                    this.navMenu.classList.remove('active');
+                    this.navToggle.classList.remove('active');
+                    this.navToggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+    }
+
+    setupSmoothScrolling() {
+        this.navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                const href = link.getAttribute('href');
+                if (href.startsWith('#')) {
+                    e.preventDefault();
+                    const target = document.querySelector(href);
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                        
+                        // Close mobile menu
+                        this.navMenu.classList.remove('active');
+                        this.navToggle.classList.remove('active');
+                        this.navToggle.setAttribute('aria-expanded', 'false');
+                    }
+                }
+            });
+        });
+    }
+
+    setupActiveLink() {
+        const observerOptions = {
+            threshold: 0.3,
+            rootMargin: '-80px 0px -80px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    this.navLinks.forEach(link => {
+                        link.classList.remove('active');
+                        if (link.getAttribute('href') === `#${id}`) {
+                            link.classList.add('active');
+                        }
+                    });
+                }
+            });
+        }, observerOptions);
+
+        // Observe sections
+        document.querySelectorAll('section[id]').forEach(section => {
+            observer.observe(section);
+        });
+    }
+
+    setupThemeToggle() {
+        const themeToggle = document.querySelector('.theme-toggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('dark-theme');
+                const isDark = document.body.classList.contains('dark-theme');
+                themeToggle.textContent = isDark ? '☀️' : '🌙';
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            });
+
+            // Load saved theme
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-theme');
+                themeToggle.textContent = '☀️';
+            }
+        }
+    }
+}
+
+// ======================================
+// Form Handler Class
+// ======================================
+
+class FormHandler {
+    constructor() {
+        this.forms = {
+            search: document.getElementById('hero-search-form'),
+            newsletter: document.getElementById('newsletter-form'),
+            login: document.getElementById('login-form'),
+            register: document.getElementById('register-form')
+        };
+        
+        this.init();
+    }
+
+    init() {
+        Object.values(this.forms).forEach(form => {
+            if (form) {
+                form.addEventListener('submit', this.handleSubmit.bind(this));
+            }
+        });
+    }
+
+    async handleSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+
         try {
-            // Check if user is already authenticated
-            await this.checkAuthStatus();
-            
-            // Setup click outside handler for user menu
-            this.setupClickOutsideHandler();
+            switch (form.id) {
+                case 'hero-search-form':
+                    await this.handleSearchSubmit(data);
+                    break;
+                case 'newsletter-form':
+                    await this.handleNewsletterSubmit(data);
+                    break;
+                case 'login-form':
+                    await this.handleLoginSubmit(data);
+                    break;
+                case 'register-form':
+                    await this.handleRegisterSubmit(data);
+                    break;
+            }
         } catch (error) {
+            console.error('Form submission error:', error);
+            messageSystem.error('Eroare la procesarea formularului');
+        }
+    }
+
+    async handleSearchSubmit(data) {
+        // Apply search filters to map
+        if (window.mapManager) {
+            const filterElements = {
+                'map-transaction-type': data.transaction_type,
+                'map-property-type': data.property_type,
+                'map-min-price': data.min_price,
+                'map-max-price': data.max_price
+            };
+
+            Object.entries(filterElements).forEach(([id, value]) => {
+                const element = document.getElementById(id);
+                if (element && value) {
+                    element.value = value;
+                }
+            });
+
+            await window.mapManager.applyFilters();
+            
+            // Scroll to map
+            document.getElementById('map')?.scrollIntoView({ behavior: 'smooth' });
+            messageSystem.success('Căutarea a fost aplicată pe hartă');
+        }
+    }
+
+    async handleNewsletterSubmit(data) {
+        // Simulate newsletter subscription
+        messageSystem.success('Te-ai abonat cu succes la newsletter!');
+    }
+
+    async handleLoginSubmit(data) {
+        try {
+            const response = await apiHandler.post('/auth/login', data);
+            messageSystem.success('Conectare reușită!');
+            authModal.hide();
+            // Handle successful login
+        } catch (error) {
+            messageSystem.error('Eroare la conectare');
+        }
+    }
+
+    async handleRegisterSubmit(data) {
+        if (data.password !== data.confirm_password) {
+            messageSystem.error('Parolele nu coincid');
+            return;
+        }
+
+        try {
+            const response = await apiHandler.post('/auth/register', data);
+            messageSystem.success('Înregistrare reușită!');
+            authModal.hide();
+        } catch (error) {
+            messageSystem.error('Eroare la înregistrare');
+        }
+    }
+}
+
+// ======================================
+// Authentication Modal Class
+// ======================================
+
+class AuthModal {
+    constructor() {
+        this.modal = document.getElementById('auth-modal');
+        this.loginForm = document.getElementById('login-form');
+        this.registerForm = document.getElementById('register-form');
+        this.modalTitle = document.getElementById('auth-modal-title');
+        
+        this.init();
+    }
+
+    init() {
+        if (!this.modal) return;
+
+        // Modal controls
+        const closeBtn = this.modal.querySelector('.modal-close');
+        const loginBtn = document.getElementById('login-btn');
+        const registerBtn = document.getElementById('register-btn');
+        const switchToRegister = document.getElementById('switch-to-register');
+        const switchToLogin = document.getElementById('switch-to-login');
+
+        closeBtn?.addEventListener('click', () => this.hide());
+        loginBtn?.addEventListener('click', () => this.showLogin());
+        registerBtn?.addEventListener('click', () => this.showRegister());
+        switchToRegister?.addEventListener('click', () => this.switchToRegister());
+        switchToLogin?.addEventListener('click', () => this.switchToLogin());
+
+        // Close on background click
+        this.modal.addEventListener('click', (e) => {
+            if (e.target === this.modal) {
+                this.hide();
+            }
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !this.modal.classList.contains('hidden')) {
+                this.hide();
+            }
+        });
+    }
+
+    show() {
+        this.modal.classList.remove('hidden');
+        this.modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    hide() {
+        this.modal.classList.add('hidden');
+        this.modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    showLogin() {
+        this.modalTitle.textContent = 'Conectare';
+        this.loginForm.style.display = 'block';
+        this.registerForm.style.display = 'none';
+        document.getElementById('switch-to-register').style.display = 'block';
+        document.getElementById('switch-to-login').style.display = 'none';
+        this.show();
+    }
+
+    showRegister() {
+        this.modalTitle.textContent = 'Înregistrare';
+        this.loginForm.style.display = 'none';
+        this.registerForm.style.display = 'block';
+        document.getElementById('switch-to-register').style.display = 'none';
+        document.getElementById('switch-to-login').style.display = 'block';
+        this.show();
+    }
+
+    switchToRegister() {
+        this.showRegister();
+    }
+
+    switchToLogin() {
+        this.showLogin();
+    }
+}
+
+// ======================================
+// Statistics Counter Class
+// ======================================
+
+class StatsCounter {
+    constructor() {
+        this.statsNumbers = document.querySelectorAll('.stat-number[data-target]');
+        this.hasAnimated = false;
+        this.init();
+    }
+
+    init() {
+        if (this.statsNumbers.length === 0) return;
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !this.hasAnimated) {
+                    this.animateCounters();
+                    this.hasAnimated = true;
+                }
+            });
+        }, { threshold: 0.5 });
+
+        this.statsNumbers.forEach(stat => observer.observe(stat));
+    }
+
+    animateCounters() {
+        this.statsNumbers.forEach(stat => {
+            const target = parseInt(stat.getAttribute('data-target'));
+            const duration = 2000;
+            const start = Date.now();
+            const startValue = 0;
+
+            const updateCounter = () => {
+                const elapsed = Date.now() - start;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Easing function
+                const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+                const current = Math.floor(startValue + (target - startValue) * easeOutQuart);
+                
+                stat.textContent = current.toLocaleString('ro-RO');
+                
+                if (progress < 1) {
+                    requestAnimationFrame(updateCounter);
+                }
+            };
+
+            updateCounter();
+        });
+    }
+}
+
+// ======================================
+// Property Listing Manager
+// ======================================
+
+class PropertyListing {
+    constructor() {
+        this.apiHandler = null;
+        this.loadingManager = null;
+        this.messageSystem = null;
+        this.currentPage = 1;
+        this.itemsPerPage = 12;
+        this.currentFilters = {};
+        this.currentSort = 'newest';
+        this.currentView = 'grid';
+        this.totalResults = 0;
+        this.isLoading = false;
+        this.searchTimeout = null;
+        
+        // Elements
+        this.elements = {
+            form: null,
+            grid: null,
+            pagination: null,
+            resultsCount: null,
+            resultsTitle: null,
+            sortSelect: null,
+            viewButtons: null,
+            quickFilters: null,
+            backToTop: null,
+            loadingContainer: null,
+            errorContainer: null,
+            emptyContainer: null,
+            advancedFilters: null,
+            advancedToggle: null,
+            showAdvanced: null,
+            totalProperties: null
+        };
+        
+        this.cities = [];
+    }
+
+    async init() {
+        // Get references to shared instances
+        this.apiHandler = window.App?.apiHandler || new APIHandler();
+        this.loadingManager = window.App?.loadingManager || new LoadingManager();
+        this.messageSystem = window.App?.messageSystem || new MessageSystem();
+        
+        this.initializeElements();
+        this.setupEventListeners();
+        await this.loadCities();
+        await this.loadInitialData();
+        this.setupURLHandling();
+        this.setupBackToTop();
+        
+        console.log('PropertyListing initialized');
+    }
+
+    initializeElements() {
+        this.elements.form = document.getElementById('property-search-form');
+        this.elements.grid = document.getElementById('properties-grid');
+        this.elements.pagination = document.querySelector('.pagination');
+        this.elements.resultsCount = document.getElementById('results-count');
+        this.elements.resultsTitle = document.querySelector('.results-title');
+        this.elements.sortSelect = document.getElementById('sort-select');
+        this.elements.viewButtons = document.querySelectorAll('.view-btn');
+        this.elements.quickFilters = document.querySelectorAll('.quick-filter-btn');
+        this.elements.backToTop = document.getElementById('back-to-top');
+        this.elements.loadingContainer = document.getElementById('loading-container');
+        this.elements.errorContainer = document.getElementById('error-container');
+        this.elements.emptyContainer = document.getElementById('empty-container');
+        this.elements.advancedFilters = document.getElementById('advanced-filters');
+        this.elements.advancedToggle = document.getElementById('toggle-advanced');
+        this.elements.showAdvanced = document.getElementById('show-advanced');
+        this.elements.totalProperties = document.getElementById('total-properties');
+    }
+
+    setupEventListeners() {
+        // Search form
+        if (this.elements.form) {
+            this.elements.form.addEventListener('submit', (e) => this.handleSearch(e));
+            
+            // Real-time search for text input
+            const searchInput = this.elements.form.querySelector('[name="search"]');
+            if (searchInput) {
+                searchInput.addEventListener('input', Utils.debounce((e) => {
+                    this.handleInstantSearch();
+                }, CONFIG.DEBOUNCE_DELAY));
+            }
+            
+            // Filter changes
+            const filterInputs = this.elements.form.querySelectorAll('select, input[type="number"]');
+            filterInputs.forEach(input => {
+                input.addEventListener('change', () => this.handleFilterChange());
+            });
+        }
+
+        // Sort selection
+        if (this.elements.sortSelect) {
+            this.elements.sortSelect.addEventListener('change', (e) => {
+                this.currentSort = e.target.value;
+                this.currentPage = 1;
+                this.loadProperties();
+            });
+        }
+
+        // View toggle
+        this.elements.viewButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleViewToggle(e));
+        });
+
+        // Quick filters
+        this.elements.quickFilters.forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleQuickFilter(e));
+        });
+
+        // Advanced filters toggle
+        if (this.elements.advancedToggle) {
+            this.elements.advancedToggle.addEventListener('click', () => this.toggleAdvancedFilters());
+        }
+        
+        if (this.elements.showAdvanced) {
+            this.elements.showAdvanced.addEventListener('click', () => this.showAdvancedFilters());
+        }
+
+        // Clear filters
+        const clearFiltersBtn = document.getElementById('clear-filters');
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', () => this.clearFilters());
+        }
+        
+        const clearSearchBtn = document.getElementById('clear-search');
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', () => this.clearFilters());
+        }
+
+        // Retry button
+        const retryBtn = document.getElementById('retry-button');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => this.loadProperties());
+        }
+
+        // Back to top
+        if (this.elements.backToTop) {
+            this.elements.backToTop.addEventListener('click', () => this.scrollToTop());
+        }
+
+        // Pagination delegation
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.pagination-item:not(.active):not(:disabled)')) {
+                e.preventDefault();
+                const page = parseInt(e.target.dataset.page);
+                if (page && page !== this.currentPage) {
+                    this.goToPage(page);
+                }
+            }
+        });
+
+        // Property card delegation
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.property-card, .property-card *:not(.property-card-favorite)')) {
+                const card = e.target.closest('.property-card');
+                if (card && !e.target.closest('.property-card-favorite')) {
+                    this.handlePropertyClick(card);
+                }
+            }
+            
+            if (e.target.matches('.property-card-favorite')) {
+                e.stopPropagation();
+                this.handleFavoriteClick(e.target);
+            }
+        });
+    }
+
+    async loadCities() {
+        try {
+            const response = await fetch('/api_properties.php?endpoint=cities');
+            const data = await response.json();
+            this.cities = data.data || [];
+            this.populateCitiesDropdown();
+        } catch (error) {
+            console.warn('Could not load cities:', error);
+            this.cities = ['București', 'Cluj-Napoca', 'Constanța', 'Iași', 'Timișoara', 'Craiova', 'Brașov', 'Galați', 'Ploiești', 'Oradea'];
+            this.populateCitiesDropdown();
+        }
+    }
+
+    populateCitiesDropdown() {
+        const citySelect = document.getElementById('city');
+        if (!citySelect || !this.cities.length) return;
+
+        // Clear existing options except the first one
+        const firstOption = citySelect.querySelector('option[value=""]');
+        citySelect.innerHTML = '';
+        if (firstOption) {
+            citySelect.appendChild(firstOption);
+        }
+
+        this.cities.forEach(city => {
+            const option = document.createElement('option');
+            option.value = city;
+            option.textContent = city;
+            citySelect.appendChild(option);
+        });
+    }
+
+    async loadInitialData() {
+        this.parseURLParams();
+        await this.loadProperties();
+        await this.loadStatistics();
+    }
+
+    parseURLParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Parse filters from URL
+        const filters = {};
+        for (const [key, value] of urlParams.entries()) {
+            if (value) {
+                filters[key] = value;
+            }
+        }
+        
+        // Parse pagination
+        this.currentPage = parseInt(urlParams.get('page')) || 1;
+        this.currentSort = urlParams.get('sort') || 'newest';
+        this.currentView = urlParams.get('view') || 'grid';
+        
+        // Set form values
+        this.setFormValues(filters);
+        this.currentFilters = filters;
+        
+        // Update UI
+        if (this.elements.sortSelect) {
+            this.elements.sortSelect.value = this.currentSort;
+        }
+        
+        this.updateViewButtons();
+    }
+
+    setFormValues(filters) {
+        if (!this.elements.form) return;
+
+        Object.keys(filters).forEach(key => {
+            const element = this.elements.form.querySelector(`[name="${key}"]`);
+            if (element) {
+                element.value = filters[key];
+            }
+        });
+    }
+
+    updateURL() {
+        const params = new URLSearchParams();
+        
+        // Add filters
+        Object.keys(this.currentFilters).forEach(key => {
+            if (this.currentFilters[key]) {
+                params.set(key, this.currentFilters[key]);
+            }
+        });
+        
+        // Add pagination and sort
+        if (this.currentPage > 1) {
+            params.set('page', this.currentPage.toString());
+        }
+        
+        if (this.currentSort !== 'newest') {
+            params.set('sort', this.currentSort);
+        }
+        
+        if (this.currentView !== 'grid') {
             console.warn('Auth check failed:', error);
         }
     }

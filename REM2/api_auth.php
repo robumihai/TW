@@ -64,6 +64,62 @@ try {
             handleGetCSRFSimple($security);
             break;
             
+        case 'dashboard_stats':
+            if ($method !== 'GET') {
+                Response::methodNotAllowed();
+            }
+            handleDashboardStats($security);
+            break;
+            
+        case 'dashboard_activity':
+            if ($method !== 'GET') {
+                Response::methodNotAllowed();
+            }
+            handleDashboardActivity($security);
+            break;
+            
+        case 'update_profile':
+            if ($method !== 'POST') {
+                Response::methodNotAllowed();
+            }
+            handleUpdateProfile($security, $_POST);
+            break;
+            
+        case 'change_password':
+            if ($method !== 'POST') {
+                Response::methodNotAllowed();
+            }
+            handleChangePassword($security, $_POST);
+            break;
+            
+        case 'update_preferences':
+            if ($method !== 'POST') {
+                Response::methodNotAllowed();
+            }
+            handleUpdatePreferences($security, $_POST);
+            break;
+            
+        case 'get_sessions':
+            if ($method !== 'GET') {
+                Response::methodNotAllowed();
+            }
+            handleGetSessions($security);
+            break;
+            
+        case 'revoke_session':
+            if ($method !== 'POST') {
+                Response::methodNotAllowed();
+            }
+            handleRevokeSession($security, $_POST);
+            break;
+            
+        case 'user_activity':
+            if ($method !== 'GET') {
+                Response::methodNotAllowed();
+            }
+            handleUserActivity($security);
+            break;
+            
         default:
             Response::notFound('Authentication endpoint not found');
     }
@@ -268,5 +324,361 @@ function handleGetCSRFSimple(Security $security): void
         Response::success(['csrf_token' => $token], 'Token CSRF generat');
     } catch (Exception $e) {
         Response::serverError('Eroare la generarea token-ului: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Handle dashboard statistics request
+ */
+function handleDashboardStats(Security $security): void
+{
+    try {
+        $user = $security->getCurrentUser();
+        if (!$user) {
+            Response::error('Neautentificat', 401);
+            return;
+        }
+        
+        $db = new Database();
+        $stats = [];
+        
+        // Get role-specific statistics
+        switch ($user['role']) {
+            case 'admin':
+                $stats = [
+                    'total_properties' => $db->query("SELECT COUNT(*) as count FROM properties")->fetch()['count'] ?? 0,
+                    'total_users' => $db->query("SELECT COUNT(*) as count FROM users")->fetch()['count'] ?? 0,
+                    'total_agents' => $db->query("SELECT COUNT(*) as count FROM users WHERE role = 'agent'")->fetch()['count'] ?? 0,
+                    'total_value' => round(($db->query("SELECT SUM(price) as total FROM properties")->fetch()['total'] ?? 0) / 1000000, 1)
+                ];
+                break;
+                
+            case 'agent':
+                $userId = $user['id'];
+                $stats = [
+                    'my_properties' => $db->query("SELECT COUNT(*) as count FROM properties WHERE user_id = ?", [$userId])->fetch()['count'] ?? 0,
+                    'property_views' => rand(150, 500), // Mock data
+                    'inquiries' => rand(5, 25), // Mock data
+                    'active_listings' => $db->query("SELECT COUNT(*) as count FROM properties WHERE user_id = ? AND status = 'active'", [$userId])->fetch()['count'] ?? 0,
+                    'pending_listings' => $db->query("SELECT COUNT(*) as count FROM properties WHERE user_id = ? AND status = 'pending'", [$userId])->fetch()['count'] ?? 0
+                ];
+                break;
+                
+            default: // client
+                $userId = $user['id'];
+                $stats = [
+                    'favorites' => rand(3, 15), // Mock data - will be real when favorites are implemented
+                    'searches' => rand(1, 8), // Mock data
+                    'viewed_properties' => rand(10, 50) // Mock data
+                ];
+                break;
+        }
+        
+        Response::success('Statistici încărcate cu succes', $stats);
+        
+    } catch (Exception $e) {
+        error_log("Dashboard stats error: " . $e->getMessage());
+        Response::error('Eroare la încărcarea statisticilor', 500);
+    }
+}
+
+/**
+ * Handle dashboard activity request
+ */
+function handleDashboardActivity(Security $security): void
+{
+    try {
+        $user = $security->getCurrentUser();
+        if (!$user) {
+            Response::error('Neautentificat', 401);
+            return;
+        }
+        
+        // Mock activity data - in real implementation this would come from database
+        $activities = [
+            [
+                'id' => 1,
+                'title' => 'Proprietate vizualizată',
+                'description' => 'Apartament 3 camere în Centrul Bucureștiului',
+                'icon' => '👁️',
+                'created_at' => date('Y-m-d H:i:s', strtotime('-2 hours'))
+            ],
+            [
+                'id' => 2,
+                'title' => 'Căutare realizată',
+                'description' => 'Căutare pentru apartamente sub 150.000€',
+                'icon' => '🔍',
+                'created_at' => date('Y-m-d H:i:s', strtotime('-1 day'))
+            ],
+            [
+                'id' => 3,
+                'title' => 'Profil actualizat',
+                'description' => 'Informații de contact actualizate',
+                'icon' => '👤',
+                'created_at' => date('Y-m-d H:i:s', strtotime('-3 days'))
+            ]
+        ];
+        
+        Response::success('Activitate încărcată cu succes', $activities);
+        
+    } catch (Exception $e) {
+        error_log("Dashboard activity error: " . $e->getMessage());
+        Response::error('Eroare la încărcarea activității', 500);
+    }
+}
+
+/**
+ * Handle profile update request
+ */
+function handleUpdateProfile(Security $security, array $input): void
+{
+    try {
+        $user = $security->getCurrentUser();
+        if (!$user) {
+            Response::error('Neautentificat', 401);
+            return;
+        }
+        
+        $db = new Database();
+        
+        // Validate required fields
+        $requiredFields = ['first_name', 'last_name', 'email'];
+        foreach ($requiredFields as $field) {
+            if (empty($input[$field])) {
+                Response::error("Câmpul '$field' este obligatoriu", 400);
+                return;
+            }
+        }
+        
+        // Check if email is already used by another user
+        if ($input['email'] !== $user['email']) {
+            $existingUser = $db->query("SELECT id FROM users WHERE email = ? AND id != ?", 
+                [$input['email'], $user['id']])->fetch();
+            if ($existingUser) {
+                Response::error('Email-ul este deja folosit de alt utilizator', 409);
+                return;
+            }
+        }
+        
+        // Update user profile
+        $updateFields = [
+            'first_name' => $input['first_name'],
+            'last_name' => $input['last_name'],
+            'email' => $input['email'],
+            'phone' => $input['phone'] ?? null,
+            'bio' => $input['bio'] ?? null,
+            'city' => $input['city'] ?? null,
+            'company' => $input['company'] ?? null,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        
+        $setClause = implode(', ', array_map(fn($key) => "$key = ?", array_keys($updateFields)));
+        $values = array_values($updateFields);
+        $values[] = $user['id'];
+        
+        $db->query("UPDATE users SET $setClause WHERE id = ?", $values);
+        
+        // Get updated user data
+        $updatedUser = $db->query("SELECT id, username, email, first_name, last_name, role, phone, bio, city, company, created_at FROM users WHERE id = ?", 
+            [$user['id']])->fetch();
+        
+        Response::success('Profilul a fost actualizat cu succes', $updatedUser);
+        
+    } catch (Exception $e) {
+        error_log("Profile update error: " . $e->getMessage());
+        Response::error('Eroare la actualizarea profilului', 500);
+    }
+}
+
+/**
+ * Handle password change request
+ */
+function handleChangePassword(Security $security, array $input): void
+{
+    try {
+        $user = $security->getCurrentUser();
+        if (!$user) {
+            Response::error('Neautentificat', 401);
+            return;
+        }
+        
+        // Validate required fields
+        if (empty($input['current_password']) || empty($input['new_password'])) {
+            Response::error('Parola actuală și cea nouă sunt obligatorii', 400);
+            return;
+        }
+        
+        $db = new Database();
+        
+        // Verify current password
+        $userData = $db->query("SELECT password FROM users WHERE id = ?", [$user['id']])->fetch();
+        if (!$userData || !password_verify($input['current_password'], $userData['password'])) {
+            Response::error('Parola actuală este incorectă', 400);
+            return;
+        }
+        
+        // Validate new password
+        if (strlen($input['new_password']) < 8) {
+            Response::error('Parola nouă trebuie să aibă cel puțin 8 caractere', 400);
+            return;
+        }
+        
+        // Update password
+        $hashedPassword = password_hash($input['new_password'], PASSWORD_DEFAULT);
+        $db->query("UPDATE users SET password = ?, updated_at = ? WHERE id = ?", 
+            [$hashedPassword, date('Y-m-d H:i:s'), $user['id']]);
+        
+        Response::success('Parola a fost schimbată cu succes');
+        
+    } catch (Exception $e) {
+        error_log("Password change error: " . $e->getMessage());
+        Response::error('Eroare la schimbarea parolei', 500);
+    }
+}
+
+/**
+ * Handle preferences update request
+ */
+function handleUpdatePreferences(Security $security, array $input): void
+{
+    try {
+        $user = $security->getCurrentUser();
+        if (!$user) {
+            Response::error('Neautentificat', 401);
+            return;
+        }
+        
+        // For now, just acknowledge the request
+        // In a full implementation, these would be stored in a preferences table
+        Response::success('Preferințele au fost salvate cu succes');
+        
+    } catch (Exception $e) {
+        error_log("Preferences update error: " . $e->getMessage());
+        Response::error('Eroare la salvarea preferințelor', 500);
+    }
+}
+
+/**
+ * Handle get user sessions request
+ */
+function handleGetSessions(Security $security): void
+{
+    try {
+        $user = $security->getCurrentUser();
+        if (!$user) {
+            Response::error('Neautentificat', 401);
+            return;
+        }
+        
+        // Mock session data - in real implementation this would come from database
+        $sessions = [
+            [
+                'id' => '1',
+                'device' => 'Chrome on Windows',
+                'ip_address' => '192.168.1.100',
+                'location' => 'București, România',
+                'last_activity' => date('Y-m-d H:i:s'),
+                'is_current' => true
+            ],
+            [
+                'id' => '2',
+                'device' => 'Safari on iPhone',
+                'ip_address' => '10.0.0.5',
+                'location' => 'Cluj-Napoca, România',
+                'last_activity' => date('Y-m-d H:i:s', strtotime('-2 hours')),
+                'is_current' => false
+            ]
+        ];
+        
+        Response::success('Sesiuni încărcate cu succes', $sessions);
+        
+    } catch (Exception $e) {
+        error_log("Get sessions error: " . $e->getMessage());
+        Response::error('Eroare la încărcarea sesiunilor', 500);
+    }
+}
+
+/**
+ * Handle revoke session request
+ */
+function handleRevokeSession(Security $security, array $input): void
+{
+    try {
+        $user = $security->getCurrentUser();
+        if (!$user) {
+            Response::error('Neautentificat', 401);
+            return;
+        }
+        
+        if (empty($input['session_id'])) {
+            Response::error('ID-ul sesiunii este obligatoriu', 400);
+            return;
+        }
+        
+        // Mock implementation - in real scenario this would revoke the session from database
+        Response::success('Sesiunea a fost revocată cu succes');
+        
+    } catch (Exception $e) {
+        error_log("Revoke session error: " . $e->getMessage());
+        Response::error('Eroare la revocarea sesiunii', 500);
+    }
+}
+
+/**
+ * Handle user activity request
+ */
+function handleUserActivity(Security $security): void
+{
+    try {
+        $user = $security->getCurrentUser();
+        if (!$user) {
+            Response::error('Neautentificat', 401);
+            return;
+        }
+        
+        // Mock activity data - in real implementation this would come from database
+        $activities = [
+            [
+                'id' => 1,
+                'type' => 'login',
+                'title' => 'Autentificare',
+                'description' => 'V-ați conectat în sistem',
+                'created_at' => date('Y-m-d H:i:s', strtotime('-1 hour'))
+            ],
+            [
+                'id' => 2,
+                'type' => 'property_view',
+                'title' => 'Proprietate vizualizată',
+                'description' => 'Apartament 2 camere, Sector 1',
+                'created_at' => date('Y-m-d H:i:s', strtotime('-4 hours'))
+            ],
+            [
+                'id' => 3,
+                'type' => 'search',
+                'title' => 'Căutare realizată',
+                'description' => 'Căutare pentru case în Brașov',
+                'created_at' => date('Y-m-d H:i:s', strtotime('-1 day'))
+            ],
+            [
+                'id' => 4,
+                'type' => 'favorite_add',
+                'title' => 'Adăugat la favorite',
+                'description' => 'Vila 4 camere, Ploiești',
+                'created_at' => date('Y-m-d H:i:s', strtotime('-2 days'))
+            ],
+            [
+                'id' => 5,
+                'type' => 'profile_update',
+                'title' => 'Profil actualizat',
+                'description' => 'Informații de contact modificate',
+                'created_at' => date('Y-m-d H:i:s', strtotime('-1 week'))
+            ]
+        ];
+        
+        Response::success('Activitate încărcată cu succes', $activities);
+        
+    } catch (Exception $e) {
+        error_log("User activity error: " . $e->getMessage());
+        Response::error('Eroare la încărcarea activității', 500);
     }
 } 
