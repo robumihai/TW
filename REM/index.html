@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real Estate Management System</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-container">
+                <h1 class="nav-logo">REM - Real Estate Manager</h1>
+                <div class="nav-menu">
+                    <a href="#" class="nav-link" onclick="showSection('map')">Map View</a>
+                    <a href="#" class="nav-link" onclick="showSection('list')">List View</a>
+                    <a href="admin/" class="nav-link">Admin Panel</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Filters Section -->
+        <section class="filters-section">
+            <div class="container">
+                <h2>Search Properties</h2>
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label for="property-type">Property Type:</label>
+                        <select id="property-type">
+                            <option value="">All Types</option>
+                            <option value="apartment">Apartment</option>
+                            <option value="house">House</option>
+                            <option value="commercial">Commercial</option>
+                            <option value="land">Land</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="transaction-type">Transaction:</label>
+                        <select id="transaction-type">
+                            <option value="">All</option>
+                            <option value="sale">For Sale</option>
+                            <option value="rent">For Rent</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="min-price">Min Price:</label>
+                        <input type="number" id="min-price" placeholder="Min Price">
+                    </div>
+                    <div class="filter-group">
+                        <label for="max-price">Max Price:</label>
+                        <input type="number" id="max-price" placeholder="Max Price">
+                    </div>
+                    <div class="filter-group">
+                        <label for="min-area">Min Area (m²):</label>
+                        <input type="number" id="min-area" placeholder="Min Area">
+                    </div>
+                    <div class="filter-group">
+                        <button id="search-btn" onclick="searchProperties()">Search</button>
+                        <button id="clear-btn" onclick="clearFilters()">Clear</button>
+                        <button id="location-btn" onclick="findNearbyProperties()">Near Me</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Map Section -->
+        <section id="map-section" class="map-section">
+            <div class="container">
+                <div class="map-controls">
+                    <h3>Map Layers</h3>
+                    <label><input type="checkbox" id="layer-pollution"> Pollution Data</label>
+                    <label><input type="checkbox" id="layer-traffic"> Traffic</label>
+                    <label><input type="checkbox" id="layer-crime"> Crime Reports</label>
+                    <label><input type="checkbox" id="layer-transport"> Transport</label>
+                </div>
+                <div id="map" class="map-container"></div>
+            </div>
+        </section>
+
+        <!-- List Section -->
+        <section id="list-section" class="list-section" style="display: none;">
+            <div class="container">
+                <div class="list-header">
+                    <h2>Properties</h2>
+                    <div class="view-controls">
+                        <button onclick="exportData('json')">Export JSON</button>
+                        <button onclick="exportData('csv')">Export CSV</button>
+                    </div>
+                </div>
+                <div id="properties-list" class="properties-grid">
+                    <!-- Properties will be loaded here -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Property Modal -->
+    <div id="property-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="modal-body">
+                <!-- Property details will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 Real Estate Management System. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="js/app.js"></script>
+    <script src="js/map.js"></script>
+</body>
+</html> 

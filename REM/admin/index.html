@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Real Estate Management System</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-container">
+                <h1 class="nav-logo">REM - Admin Panel</h1>
+                <div class="nav-menu">
+                    <a href="../index.html" class="nav-link">Back to Main Site</a>
+                    <a href="#" class="nav-link" onclick="logout()">Logout</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="admin-main">
+        <div class="container">
+            <!-- Dashboard Section -->
+            <section class="dashboard-section">
+                <h2>Dashboard</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Properties</h3>
+                        <div class="stat-number" id="total-properties">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>For Sale</h3>
+                        <div class="stat-number" id="sale-properties">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>For Rent</h3>
+                        <div class="stat-number" id="rent-properties">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Value</h3>
+                        <div class="stat-number" id="total-value">-</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Actions Section -->
+            <section class="actions-section">
+                <h2>Actions</h2>
+                <div class="actions-grid">
+                    <button class="action-btn" onclick="showAddPropertyForm()">
+                        <span class="btn-icon">+</span>
+                        Add Property
+                    </button>
+                    <button class="action-btn" onclick="showImportForm()">
+                        <span class="btn-icon">📥</span>
+                        Import Data
+                    </button>
+                    <button class="action-btn" onclick="exportData('json')">
+                        <span class="btn-icon">📤</span>
+                        Export JSON
+                    </button>
+                    <button class="action-btn" onclick="exportData('csv')">
+                        <span class="btn-icon">📊</span>
+                        Export CSV
+                    </button>
+                </div>
+            </section>
+
+            <!-- Properties Management Section -->
+            <section class="properties-section">
+                <div class="section-header">
+                    <h2>Manage Properties</h2>
+                    <div class="search-box">
+                        <input type="text" id="admin-search" placeholder="Search properties..." onkeyup="searchProperties()">
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table class="properties-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Type</th>
+                                <th>Transaction</th>
+                                <th>Price</th>
+                                <th>Area (m²)</th>
+                                <th>Address</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="properties-table-body">
+                            <!-- Properties will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Add/Edit Property Modal -->
+    <div id="property-form-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closePropertyForm()">&times;</span>
+            <h2 id="form-title">Add Property</h2>
+            <form id="property-form" onsubmit="submitProperty(event)">
+                <input type="hidden" id="property-id">
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="property-title">Title *</label>
+                        <input type="text" id="property-title" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="property-type">Type *</label>
+                        <select id="property-type" required>
+                            <option value="">Select Type</option>
+                            <option value="apartment">Apartment</option>
+                            <option value="house">House</option>
+                            <option value="commercial">Commercial</option>
+                            <option value="land">Land</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="property-transaction">Transaction *</label>
+                        <select id="property-transaction" required>
+                            <option value="">Select Transaction</option>
+                            <option value="sale">For Sale</option>
+                            <option value="rent">For Rent</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="property-price">Price *</label>
+                        <input type="number" id="property-price" min="0" step="0.01" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="property-area">Area (m²) *</label>
+                        <input type="number" id="property-area" min="0" step="0.01" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="property-rooms">Rooms</label>
+                        <input type="number" id="property-rooms" min="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="property-address">Address *</label>
+                        <input type="text" id="property-address" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="property-latitude">Latitude</label>
+                        <input type="number" id="property-latitude" step="any">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="property-longitude">Longitude</label>
+                        <input type="number" id="property-longitude" step="any">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="property-condition">Building Condition</label>
+                        <select id="property-condition">
+                            <option value="">Select Condition</option>
+                            <option value="new">New</option>
+                            <option value="good">Good</option>
+                            <option value="renovated">Renovated</option>
+                            <option value="needs_renovation">Needs Renovation</option>
+                            <option value="poor">Poor</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="property-description">Description</label>
+                    <textarea id="property-description" rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="property-facilities">Facilities</label>
+                    <textarea id="property-facilities" rows="2"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="property-risks">Risks</label>
+                    <textarea id="property-risks" rows="2"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="property-contact">Contact Information</label>
+                    <textarea id="property-contact" rows="2"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="property-images">Images (URLs)</label>
+                    <input type="text" id="property-images" placeholder="Image URL">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" onclick="closePropertyForm()">Cancel</button>
+                    <button type="submit">Save Property</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="import-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeImportForm()">&times;</span>
+            <h2>Import Data</h2>
+            <form id="import-form" onsubmit="submitImport(event)">
+                <div class="form-group">
+                    <label for="import-file">Select File (CSV or JSON)</label>
+                    <input type="file" id="import-file" accept=".csv,.json" required>
+                    <small>Maximum file size: 5MB</small>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" onclick="closeImportForm()">Cancel</button>
+                    <button type="submit">Import</button>
+                </div>
+            </form>
+            
+            <div id="import-progress" class="progress-section" style="display: none;">
+                <h3>Import Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <div id="import-status"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/app.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html> 
