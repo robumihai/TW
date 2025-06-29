@@ -30,7 +30,7 @@ function showSection(section) {
 
 // Load properties from API
 function loadProperties() {
-    makeAjaxRequest('GET', 'api/properties.php', null, function(response) {
+    makeAjaxRequest('GET', 'http://localhost:8000/api/properties.php', null, function(response) {
         properties = response.data || [];
         filteredProperties = properties;
         displayPropertiesList(properties);
@@ -221,7 +221,7 @@ window.onclick = function(event) {
 
 // Export data functionality
 function exportData(format) {
-    const url = `api/export.php?format=${format}`;
+    const url = `http://localhost:8000/api/export.php?format=${format}`;
     makeAjaxRequest('GET', url, null, function(response) {
         if (format === 'json') {
             downloadFile(JSON.stringify(response.data, null, 2), 'properties.json', 'application/json');

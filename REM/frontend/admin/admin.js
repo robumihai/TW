@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Load properties for admin panel
 function loadAdminProperties() {
-    makeAjaxRequest('GET', '../api/properties.php', null, function(response) {
+    makeAjaxRequest('GET', 'http://localhost:8000/api/properties.php', null, function(response) {
         adminProperties = response.data || [];
         displayPropertiesTable(adminProperties);
         updateDashboardStats();
@@ -156,7 +156,7 @@ function submitProperty(event) {
         formData.id = currentEditingProperty.id;
     }
 
-    makeAjaxRequest(method, '../api/properties.php', formData, function(response) {
+    makeAjaxRequest(method, 'http://localhost:8000/api/properties.php', formData, function(response) {
         showAdminNotification(isEditing ? 'Property updated successfully' : 'Property added successfully', 'success');
         closePropertyForm();
         loadAdminProperties(); // Reload the properties
@@ -171,7 +171,7 @@ function deleteProperty(propertyId) {
         return;
     }
 
-    makeAjaxRequest('DELETE', '../api/properties.php', { id: propertyId }, function(response) {
+    makeAjaxRequest('DELETE', 'http://localhost:8000/api/properties.php', { id: propertyId }, function(response) {
         showAdminNotification('Property deleted successfully', 'success');
         loadAdminProperties(); // Reload the properties
     }, function(error) {
@@ -213,7 +213,7 @@ function submitImport(event) {
 
     // Use XMLHttpRequest for file upload with progress
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', '../api/import.php', true);
+    xhr.open('POST', 'http://localhost:8000/api/import.php', true);
     
     xhr.upload.onprogress = function(e) {
         if (e.lengthComputable) {
@@ -279,7 +279,7 @@ function closeImportForm() {
 
 // Export data (reuse from main app)
 function exportData(format) {
-    window.open(`../api/export.php?format=${format}`, '_blank');
+    window.open(`http://localhost:8000/api/export.php?format=${format}`, '_blank');
     showAdminNotification(`Exporting data as ${format.toUpperCase()}...`, 'info');
 }
 
