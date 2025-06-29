@@ -255,7 +255,7 @@ function makeAjaxRequest(method, url, data, successCallback, errorCallback) {
     
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
-            if (xhr.status === 200) {
+            if (xhr.status === 200 || xhr.status === 201) {
                 try {
                     const response = JSON.parse(xhr.responseText);
                     successCallback(response);
@@ -319,4 +319,30 @@ function showNotification(message, type = 'info') {
             notification.parentNode.removeChild(notification);
         }
     }, 3000);
+}
+
+// Function to save property
+async function saveProperty(propertyData) {
+    try {
+        const response = await fetch('http://localhost:8000/api/properties.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(propertyData),
+            credentials: 'include'
+        });
+
+        const data = await response.json();
+        
+        if (response.ok || response.status === 201) {
+            showNotification('Property saved successfully', 'success');
+            document.getElementById('propertyForm').reset();
+            await loadProperties();
+        } else {
+            throw new Error(data.error || 'Failed to save property');
+        }
+    } catch (error) {
+        showNotification(error.message, 'error');
+    }
 } 
