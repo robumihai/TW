@@ -16,7 +16,6 @@ function loadAdminProperties() {
         updateDashboardStats();
     }, function(error) {
         console.error('Error loading properties:', error);
-        showAdminNotification('Error loading properties', 'error');
     });
 }
 

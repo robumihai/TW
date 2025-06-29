@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentație - Cerințe Sistem</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-container">
+                <h1 class="nav-logo">REM - Documentație</h1>
+                <div class="nav-menu">
+                    <a href="index.html" class="nav-link">Admin Panel</a>
+                    <a href="../index.html" class="nav-link">Back to Main Site</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main class="admin-main">
+        <div class="container">
+            <!-- Scholarly HTML: System Requirements Specification -->
+            <section id="system-requirements" typeof="scholarly:RequirementsSpecification" resource="#requirements">
+                <h2 property="schema:name">Specificația cerințelor sistemului</h2>
+                <section typeof="scholarly:Introduction">
+                    <h3>Introducere</h3>
+                    <p property="schema:description">
+                        Această secțiune descrie cerințele funcționale esențiale ale aplicației "Sistem de Management Imobiliar" și modul de interacțiune cu utilizatorul, în conformitate cu recomandările IEEE System Requirements Specification.
+                    </p>
+                </section>
+                <section typeof="scholarly:FunctionalRequirements">
+                    <h3>Cerințe funcționale esențiale</h3>
+                    <ul>
+                        <li><b>Autentificare și gestionare utilizatori</b>
+                            <ul>
+                                <li>Utilizatorii se pot înregistra cu nume de utilizator, email și parolă.</li>
+                                <li>Utilizatorii se pot autentifica cu nume de utilizator și parolă.</li>
+                                <li>Sistemul validează datele la înregistrare și autentificare.</li>
+                                <li>Utilizatorii se pot deloga din aplicație.</li>
+                                <li>Sistemul diferențiază între utilizatori obișnuiți și administratori.</li>
+                            </ul>
+                        </li>
+                        <li><b>Gestionarea proprietăților imobiliare</b>
+                            <ul>
+                                <li>Utilizatorii autentificați pot vizualiza lista proprietăților disponibile.</li>
+                                <li>Utilizatorii pot filtra proprietățile după criterii (locație, preț, suprafață, tip).</li>
+                                <li>Administratorii pot adăuga, edita și șterge proprietăți.</li>
+                                <li>Fiecare proprietate afișează detalii relevante: titlu, tip, preț, suprafață, adresă, descriere etc.</li>
+                            </ul>
+                        </li>
+                        <li><b>Import și export de date</b>
+                            <ul>
+                                <li>Administratorii pot importa date despre proprietăți din fișiere CSV sau JSON.</li>
+                                <li>Utilizatorii pot exporta lista proprietăților în format CSV sau JSON.</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </section>
+                <section typeof="scholarly:UserInteraction">
+                    <h3>Cerințe privind interacțiunea cu utilizatorul</h3>
+                    <ul>
+                        <li>Aplicația oferă o interfață web intuitivă, accesibilă din browser, pentru utilizatori și administratori.</li>
+                        <li>Utilizatorii primesc feedback vizual pentru acțiunile efectuate (ex: mesaje de succes sau eroare).</li>
+                        <li>Navigarea între secțiuni (autentificare, listă proprietăți, panou administrare) este facilă și clar structurată.</li>
+                        <li>Datele sensibile (parole, sesiuni) sunt gestionate securizat.</li>
+                        <li>Accesul la funcționalitățile de administrare este restricționat doar administratorilor.</li>
+                        <li>Link-ul static către Admin Panel este prezent în navbar, lângă "Back to Main Site".</li>
+                    </ul>
+                </section>
+                <section typeof="scholarly:Conclusion">
+                    <h3>Concluzie</h3>
+                    <p>
+                        Aceste cerințe definesc funcționalitățile de bază și modul de interacțiune cu utilizatorul pentru aplicația de management imobiliar, asigurând o experiență sigură, eficientă și ușor de utilizat.
+                    </p>
+                </section>
+            </section>
+            <!-- END Scholarly HTML -->
+        </div>
+    </main>
+    <script src="../js/app.js"></script>
+    <script src="admin.js"></script>
+    <script src="../js/auth.js"></script>
+</body>
+</html> 

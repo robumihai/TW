@@ -39,7 +39,6 @@ function loadProperties() {
         }
     }, function(error) {
         console.error('Error loading properties:', error);
-        showNotification('Error loading properties', 'error');
     });
 }
 
