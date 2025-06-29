@@ -240,5 +240,15 @@
 
     <script src="../js/app.js"></script>
     <script src="admin.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        // Protect this route (admin only)
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = await protectRoute(true); // true means admin-only
+            if (user) {
+                document.getElementById('userInfo').textContent = `Admin: ${user.username}`;
+            }
+        });
+    </script>
 </body>
 </html> 

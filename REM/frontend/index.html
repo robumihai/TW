@@ -18,6 +18,10 @@
                     <a href="#" class="nav-link" onclick="showSection('list')">List View</a>
                     <a href="admin/" class="nav-link">Admin Panel</a>
                 </div>
+                <div class="nav-links">
+                    <span id="userInfo"></span>
+                    <button class="logout-btn">Logout</button>
+                </div>
             </div>
         </nav>
     </header>
@@ -116,5 +120,24 @@
 
     <script src="js/app.js"></script>
     <script src="js/map.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        // Protect this route
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = await protectRoute();
+            if (user) {
+                document.getElementById('userInfo').textContent = `Welcome, ${user.username}`;
+                
+                // Show admin link if user is admin
+                if (user.role === 'admin') {
+                    const adminLink = document.createElement('a');
+                    adminLink.href = '/admin/';
+                    adminLink.className = 'admin-link';
+                    adminLink.textContent = 'Admin Panel';
+                    document.querySelector('.nav-links').insertBefore(adminLink, document.querySelector('.logout-btn'));
+                }
+            }
+        });
+    </script>
 </body>
 </html> 

@@ -56,6 +56,44 @@ body {
     opacity: 0.8;
 }
 
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+#userInfo {
+    color: #333;
+    font-weight: 500;
+}
+
+.logout-btn {
+    padding: 8px 16px;
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.logout-btn:hover {
+    background-color: #c0392b;
+}
+
+.admin-link {
+    padding: 8px 16px;
+    background-color: #3498db;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.admin-link:hover {
+    background-color: #2980b9;
+}
+
 /* Filters Section */
 .filters-section {
     background: white;
@@ -392,4 +430,31 @@ footer {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Toast notification styles */
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    background-color: #333;
+    color: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    display: none;
+    z-index: 1000;
+}
+
+.toast.error {
+    background-color: #e74c3c;
+}
+
+.toast.success {
+    background-color: #2ecc71;
+}
+
+.toast.warning {
+    background-color: #f1c40f;
+    color: #333;
 } 
